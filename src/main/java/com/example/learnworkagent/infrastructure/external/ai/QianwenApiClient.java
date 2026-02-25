@@ -99,10 +99,12 @@ public class QianwenApiClient {
                 .map(response -> {
                     log.info("千问API响应: {}", response);
                     if (response != null && response.containsKey("choices")) {
+                        @SuppressWarnings("unchecked")
                         List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
                         if (choices != null && !choices.isEmpty()) {
                             Map<String, Object> choice = choices.get(0);
                             if (choice.containsKey("message")) {
+                                @SuppressWarnings("unchecked")
                                 Map<String, Object> messageObj = (Map<String, Object>) choice.get("message");
                                 if (messageObj != null && messageObj.containsKey("content")) {
                                     return (String) messageObj.get("content");

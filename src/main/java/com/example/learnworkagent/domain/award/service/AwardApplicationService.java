@@ -6,6 +6,7 @@ import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.domain.award.entity.AwardApplication;
 import com.example.learnworkagent.domain.award.repository.AwardApplicationRepository;
+import com.example.learnworkagent.infrastructure.external.ai.OcrService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -15,6 +16,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -27,6 +29,7 @@ import java.util.List;
 public class AwardApplicationService {
 
     private final AwardApplicationRepository awardApplicationRepository;
+    private final OcrService ocrService;
 
     /**
      * 提交奖助申请
@@ -102,13 +105,92 @@ public class AwardApplicationService {
         String applicationType = application.getApplicationType();
         if ("SCHOLARSHIP".equals(applicationType)) {
             // 奖学金需要成绩单、推荐信等
-            return true; // todo简化处理，实际应该检查具体附件
+            return checkScholarshipMaterials(application.getAttachmentUrls()); // todo简化处理，实际应该检查具体附件
         } else if ("GRANT".equals(applicationType) || "SUBSIDY".equals(applicationType)) {
             // todo助学金和困难补助需要家庭情况证明等
-            return true; // 简化处理
+            return checkGrantMaterials(application.getAttachmentUrls()); // 简化处理
         }
 
         return true;
+    }
+
+    /**
+     * 检查奖学金材料是否提供
+     *
+     * @param attachmentUrls 奖学金url
+     * @return 是否提供
+     */
+    private boolean checkScholarshipMaterials(String attachmentUrls) {
+        String[] urls = attachmentUrls.split(",");
+        boolean hasTranscript = false;
+        boolean hasRecommendation = false;
+
+        for (String url : urls) {
+            String trimmedUrl = url.trim();
+            if (trimmedUrl.isEmpty()) {
+                continue;
+            }
+
+            try {
+                Boolean isTranscript = ocrService.checkDocumentType(trimmedUrl, "成绩单")
+                        //设置阻塞超时时间，如果超过30秒则抛出超时异常
+                        .block(Duration.ofSeconds(30));
+                if (Boolean.TRUE.equals(isTranscript)) {
+                    hasTranscript = true;
+                    log.info("检测到成绩单: {}", trimmedUrl);
+                }
+
+                Boolean isRecommendation = ocrService.checkDocumentType(trimmedUrl, "推荐信")
+                        .block(Duration.ofSeconds(30));
+                if (Boolean.TRUE.equals(isRecommendation)) {
+                    hasRecommendation = true;
+                    log.info("检测到推荐信: {}", trimmedUrl);
+                }
+            } catch (Exception e) {
+                log.error("OCR 识别失败: {}", trimmedUrl, e);
+            }
+        }
+
+        return hasTranscript && hasRecommendation;
+    }
+
+    /**
+     * 检查助学金材料是否提供
+     *
+     * @param attachmentUrls 助学金材料url
+     * @return 是否提供
+     */
+    private boolean checkGrantMaterials(String attachmentUrls) {
+        String[] urls = attachmentUrls.split(",");
+        boolean hasFamilyProof = false;
+        boolean hasIncomeProof = false;
+
+        for (String url : urls) {
+            String trimmedUrl = url.trim();
+            if (trimmedUrl.isEmpty()) {
+                continue;
+            }
+
+            try {
+                Boolean isFamilyProof = ocrService.checkDocumentType(trimmedUrl, "家庭情况证明")
+                        .block(Duration.ofSeconds(30));
+                if (Boolean.TRUE.equals(isFamilyProof)) {
+                    hasFamilyProof = true;
+                    log.info("检测到家庭情况证明: {}", trimmedUrl);
+                }
+
+                Boolean isIncomeProof = ocrService.checkDocumentType(trimmedUrl, "收入证明")
+                        .block(Duration.ofSeconds(30));
+                if (Boolean.TRUE.equals(isIncomeProof)) {
+                    hasIncomeProof = true;
+                    log.info("检测到收入证明: {}", trimmedUrl);
+                }
+            } catch (Exception e) {
+                log.error("OCR 识别失败: {}", trimmedUrl, e);
+            }
+        }
+
+        return hasFamilyProof && hasIncomeProof;
     }
 
     /**
