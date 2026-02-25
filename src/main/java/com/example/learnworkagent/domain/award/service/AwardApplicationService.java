@@ -132,19 +132,21 @@ public class AwardApplicationService {
             }
 
             try {
-                Boolean isTranscript = ocrService.checkDocumentType(trimmedUrl, "成绩单")
-                        //设置阻塞超时时间，如果超过30秒则抛出超时异常
-                        .block(Duration.ofSeconds(30));
-                if (Boolean.TRUE.equals(isTranscript)) {
+                // 每个 URL 只调用一次 OCR，根据识别结果判断是否满足条件
+                String documentType = ocrService.identifyDocumentType(trimmedUrl)
+                        .block(Duration.ofSeconds(15)); // 减少阻塞时间
+
+                if ("成绩单".equals(documentType)) {
                     hasTranscript = true;
                     log.info("检测到成绩单: {}", trimmedUrl);
-                }
-
-                Boolean isRecommendation = ocrService.checkDocumentType(trimmedUrl, "推荐信")
-                        .block(Duration.ofSeconds(30));
-                if (Boolean.TRUE.equals(isRecommendation)) {
+                } else if ("推荐信".equals(documentType)) {
                     hasRecommendation = true;
                     log.info("检测到推荐信: {}", trimmedUrl);
+                }
+
+                // 如果两种材料都找到了，提前结束循环
+                if (hasTranscript && hasRecommendation) {
+                    break;
                 }
             } catch (Exception e) {
                 log.error("OCR 识别失败: {}", trimmedUrl, e);
@@ -172,18 +174,21 @@ public class AwardApplicationService {
             }
 
             try {
-                Boolean isFamilyProof = ocrService.checkDocumentType(trimmedUrl, "家庭情况证明")
-                        .block(Duration.ofSeconds(30));
-                if (Boolean.TRUE.equals(isFamilyProof)) {
+                // 每个 URL 只调用一次 OCR，根据识别结果判断是否满足条件
+                String documentType = ocrService.identifyDocumentType(trimmedUrl)
+                        .block(Duration.ofSeconds(15)); // 减少阻塞时间
+
+                if ("家庭情况证明".equals(documentType)) {
                     hasFamilyProof = true;
                     log.info("检测到家庭情况证明: {}", trimmedUrl);
-                }
-
-                Boolean isIncomeProof = ocrService.checkDocumentType(trimmedUrl, "收入证明")
-                        .block(Duration.ofSeconds(30));
-                if (Boolean.TRUE.equals(isIncomeProof)) {
+                } else if ("收入证明".equals(documentType)) {
                     hasIncomeProof = true;
                     log.info("检测到收入证明: {}", trimmedUrl);
+                }
+
+                // 如果两种材料都找到了，提前结束循环
+                if (hasFamilyProof && hasIncomeProof) {
+                    break;
                 }
             } catch (Exception e) {
                 log.error("OCR 识别失败: {}", trimmedUrl, e);

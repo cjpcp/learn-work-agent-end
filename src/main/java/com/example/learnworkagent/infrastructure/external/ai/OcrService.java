@@ -83,17 +83,26 @@ public class OcrService {
         log.info("开始分析文档，URL: {}", fileUrl);
 
         WebClient webClient = WebClient.builder()
-                .baseUrl("https://dashscope.aliyuncs.com")
+                .baseUrl("https://dashscope.aliyuncs.com/compatible-mode/v1")
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
 
         Map<String, Object> message = new HashMap<>();
         message.put("role", "user");
 
-        Map<String, String> image = new HashMap<>();
-        image.put("image", fileUrl);
+        // 构建正确的 content 结构
+        Map<String, Object> textContent = new HashMap<>();
+        textContent.put("type", "text");
+        textContent.put("text", prompt);
 
-        message.put("content", List.of(prompt, image));
+        Map<String, Object> imageUrlContent = new HashMap<>();
+        imageUrlContent.put("type", "image_url");
+
+        Map<String, String> imageUrl = new HashMap<>();
+        imageUrl.put("url", fileUrl);
+        imageUrlContent.put("image_url", imageUrl);
+
+        message.put("content", List.of(textContent, imageUrlContent));
 
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("enable_search", false);
@@ -107,7 +116,7 @@ public class OcrService {
         log.debug("请求体: {}", requestBody);
 
         return webClient.post()
-                .uri("/compatible-mode/v1/chat/completions")
+                .uri("/chat/completions")
                 .header("Authorization", "Bearer " + apiKey)
                 .bodyValue(requestBody)
                 .retrieve()
@@ -134,7 +143,7 @@ public class OcrService {
                 .doOnError(error -> {
                     if (error instanceof WebClientResponseException) {
                         WebClientResponseException wcre = (WebClientResponseException) error;
-                        log.error("调用千问 OCR API 失败 - 状态码: {}, 响应体: {}", 
+                        log.error("调用千问 OCR API 失败 - 状态码: {}, 响应体: {}",
                                 wcre.getStatusCode(), wcre.getResponseBodyAsString());
                     } else {
                         log.error("调用千问 OCR API 失败", error);
@@ -146,7 +155,7 @@ public class OcrService {
                     }
                     if (error instanceof WebClientResponseException) {
                         WebClientResponseException wcre = (WebClientResponseException) error;
-                        String errorMsg = "OCR 服务调用失败 - 状态码: " + wcre.getStatusCode() + 
+                        String errorMsg = "OCR 服务调用失败 - 状态码: " + wcre.getStatusCode() +
                                 ", 响应: " + wcre.getResponseBodyAsString();
                         return Mono.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, errorMsg));
                     }
