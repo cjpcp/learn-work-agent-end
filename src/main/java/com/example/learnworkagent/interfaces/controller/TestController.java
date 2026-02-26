@@ -1,12 +1,14 @@
 package com.example.learnworkagent.interfaces.controller;
 
 import com.example.learnworkagent.common.Result;
+import com.example.learnworkagent.domain.leave.service.LeaveApplicationService;
 import com.example.learnworkagent.infrastructure.external.ai.OcrService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,6 +25,7 @@ import reactor.core.publisher.Mono;
 public class TestController {
 
     private final OcrService ocrService;
+    private final LeaveApplicationService leaveApplicationService;
 
     /**
      * 测试 OCR 服务 - 识别文档类型
@@ -80,5 +83,25 @@ public class TestController {
     @GetMapping("/health")
     public Result<String> healthCheck() {
         return Result.success("OK", "服务运行正常");
+    }
+
+    /**
+     * 测试生成请假条
+     *
+     * @param applicationId 请假申请ID
+     * @return 生成结果
+     */
+    @Operation(summary = "测试生成请假条", description = "生成请假条PDF并上传到OSS")
+    @GetMapping("/leave/generate-slip/{applicationId}")
+    public Result<String> testGenerateLeaveSlip(@PathVariable Long applicationId) {
+        log.info("测试生成请假条，申请ID: {}", applicationId);
+        
+        try {
+            leaveApplicationService.generateLeaveSlip(applicationId);
+            return Result.success("请假条生成成功", "请假条已生成并上传到OSS");
+        } catch (Exception e) {
+            log.error("生成请假条失败", e);
+            return Result.fail("生成请假条失败: " + e.getMessage());
+        }
     }
 }

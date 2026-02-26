@@ -6,6 +6,8 @@ import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.repository.LeaveApplicationRepository;
+import com.example.learnworkagent.infrastructure.external.oss.OssService;
+import com.example.learnworkagent.infrastructure.external.template.TemplateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -13,7 +15,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -27,6 +35,8 @@ import java.time.temporal.ChronoUnit;
 public class LeaveApplicationService {
 
     private final LeaveApplicationRepository leaveApplicationRepository;
+    private final TemplateService templateService;
+    private final OssService ossService;
 
     /**
      * 提交请假申请
@@ -95,10 +105,67 @@ public class LeaveApplicationService {
             throw new BusinessException(ResultCode.PARAM_ERROR, "只有已批准的申请才能生成请假条");
         }
 
-        // TODO: 调用模板服务生成请假条PDF
-        application.setLeaveSlipStatus("GENERATED");
-        application.setLeaveSlipUrl("/leave-slips/" + applicationId + ".pdf");
-        leaveApplicationRepository.save(application);
+        try {
+            // 生成请假条PDF
+            byte[] pdfBytes = templateService.generateLeaveSlip(application);
+            
+            // 上传到OSS
+            // 创建MultipartFile对象
+            MultipartFile pdfFile = new MultipartFile() {
+                @Override
+                public String getName() {
+                    return "leave-slip-" + applicationId + ".pdf";
+                }
+
+                @Override
+                public String getOriginalFilename() {
+                    return "leave-slip-" + applicationId + ".pdf";
+                }
+
+                @Override
+                public String getContentType() {
+                    return "application/pdf";
+                }
+
+                @Override
+                public boolean isEmpty() {
+                    return pdfBytes == null || pdfBytes.length == 0;
+                }
+
+                @Override
+                public long getSize() {
+                    return pdfBytes.length;
+                }
+
+                @Override
+                public byte[] getBytes() throws IOException {
+                    return pdfBytes;
+                }
+
+                @Override
+                public InputStream getInputStream() throws IOException {
+                    return new ByteArrayInputStream(pdfBytes);
+                }
+
+                @Override
+                public void transferTo(File dest) throws IOException, IllegalStateException {
+                    Files.write(dest.toPath(), pdfBytes);
+                }
+            };
+            
+            // 上传到OSS
+            String fileUrl = ossService.uploadFile(pdfFile, "leave-slips");
+            
+            // 更新请假条状态和URL
+            application.setLeaveSlipStatus("GENERATED");
+            application.setLeaveSlipUrl(fileUrl);
+            leaveApplicationRepository.save(application);
+            
+            log.info("请假条生成成功，URL: {}", fileUrl);
+        } catch (Exception e) {
+            log.error("生成请假条失败: {}", e.getMessage(), e);
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "生成请假条失败: " + e.getMessage());
+        }
     }
 
     /**

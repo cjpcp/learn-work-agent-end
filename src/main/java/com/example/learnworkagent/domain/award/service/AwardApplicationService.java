@@ -105,10 +105,9 @@ public class AwardApplicationService {
         String applicationType = application.getApplicationType();
         if ("SCHOLARSHIP".equals(applicationType)) {
             // 奖学金需要成绩单、推荐信等
-            return checkScholarshipMaterials(application.getAttachmentUrls()); // todo简化处理，实际应该检查具体附件
+            return checkScholarshipMaterials(application.getAttachmentUrls());
         } else if ("GRANT".equals(applicationType) || "SUBSIDY".equals(applicationType)) {
-            // todo助学金和困难补助需要家庭情况证明等
-            return checkGrantMaterials(application.getAttachmentUrls()); // 简化处理
+            return checkGrantMaterials(application.getAttachmentUrls());
         }
 
         return true;
