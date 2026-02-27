@@ -90,6 +90,11 @@ public class LeaveApplicationService {
 
         leaveApplicationRepository.save(application);
 
+        // 当审批通过时，自动生成请假条
+        if ("APPROVED".equals(approvalStatus)) {
+            generateLeaveSlip(applicationId);
+        }
+
         // TODO: 发送审批结果通知（通过消息队列）
     }
 

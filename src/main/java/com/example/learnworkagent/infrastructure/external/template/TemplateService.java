@@ -1,8 +1,11 @@
 package com.example.learnworkagent.infrastructure.external.template;
 
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
+import com.example.learnworkagent.domain.user.entity.User;
+import com.example.learnworkagent.domain.user.repository.UserRepository;
 import com.itextpdf.text.*;
 import com.itextpdf.text.pdf.*;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +18,10 @@ import java.time.format.DateTimeFormatter;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class TemplateService {
+
+    private final UserRepository userRepository;
 
     private static final String FONT_PATH = "C:\\Windows\\Fonts\\simhei.ttf";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月dd日");
@@ -82,8 +88,17 @@ public class TemplateService {
             table.setWidths(new float[]{1, 3});
 
             // 添加请假信息
-            addTableCell(table, "申请人ID：", labelFont);
-            addTableCell(table, application.getApplicantId().toString(), contentFont);
+            addTableCell(table, "申请人姓名：", labelFont);
+            String applicantName = "未知";
+            try {
+                User user = userRepository.findById(application.getApplicantId()).orElse(null);
+                if (user != null && user.getRealName() != null) {
+                    applicantName = user.getRealName();
+                }
+            } catch (Exception e) {
+                log.error("获取申请人姓名失败", e);
+            }
+            addTableCell(table, applicantName, contentFont);
 
             addTableCell(table, "请假类型：", labelFont);
             addTableCell(table, LEAVE_TYPE_MAP.getOrDefault(application.getLeaveType(), application.getLeaveType()), contentFont);

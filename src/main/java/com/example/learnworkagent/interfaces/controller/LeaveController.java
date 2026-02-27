@@ -9,9 +9,13 @@ import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.service.LeaveApplicationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 
 /**
  * 请假管理控制器
@@ -125,5 +129,31 @@ public class LeaveController extends BaseController {
     public Result<Void> cancelLeave(@PathVariable Long id) {
         leaveApplicationService.cancelLeave(id);
         return Result.success();
+    }
+
+    /**
+     * 下载请假条PDF
+     *
+     * @param id 请假id
+     * @param response HTTP响应
+     */
+    @Operation(summary = "下载请假条PDF", description = "下载已生成的请假条PDF文件")
+    @GetMapping("/applications/{id}/download-slip")
+    public void downloadLeaveSlip(@PathVariable Long id, HttpServletResponse response) {
+        LeaveApplication application = leaveApplicationService.getApplicationById(id);
+        
+        // 如果请假条尚未生成，自动生成
+        if (application.getLeaveSlipUrl() == null || application.getLeaveSlipUrl().isEmpty()) {
+            leaveApplicationService.generateLeaveSlip(id);
+            // 重新获取更新后的申请信息
+            application = leaveApplicationService.getApplicationById(id);
+        }
+        
+        try {
+            // 重定向到OSS文件URL
+            response.sendRedirect(application.getLeaveSlipUrl());
+        } catch (Exception e) {
+            throw new RuntimeException("下载请假条失败: " + e.getMessage());
+        }
     }
 }
