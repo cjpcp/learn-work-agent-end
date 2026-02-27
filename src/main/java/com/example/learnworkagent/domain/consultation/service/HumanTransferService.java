@@ -30,7 +30,7 @@ public class HumanTransferService {
     private final ConsultationQuestionRepository consultationQuestionRepository;
 
     /**
-     * 创建转接记录
+     * 创建转接记录并更新问题为转接状态
      */
     @Transactional
     public void createTransfer(Long questionId, Long userId, String transferType, String reason) {

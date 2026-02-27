@@ -12,9 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.NativeWebRequest;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.stream.Collectors;
 
@@ -55,14 +53,14 @@ public class GlobalExceptionHandler {
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
         log.error("参数绑定异常: {}", message);
-        
+
         // 检查请求是否接受text/event-stream
         String acceptHeader = request.getHeader("Accept");
         if (acceptHeader != null && acceptHeader.contains(MediaType.TEXT_EVENT_STREAM_VALUE)) {
             // 对于SSE请求，返回错误信息而不中断流
             return ResponseEntity.status(400).body(Result.fail(ResultCode.PARAM_INVALID.getCode(), message));
         }
-        
+
         return Result.fail(ResultCode.PARAM_INVALID.getCode(), message);
     }
 
@@ -72,14 +70,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public Object handleAccessDeniedException(AccessDeniedException e, NativeWebRequest request) {
         log.error("访问拒绝异常: {}", e.getMessage());
-        
+
         // 检查请求是否接受text/event-stream
         String acceptHeader = request.getHeader("Accept");
         if (acceptHeader != null && acceptHeader.contains(MediaType.TEXT_EVENT_STREAM_VALUE)) {
             // 对于SSE请求，返回错误信息
             return ResponseEntity.status(403).body(Result.fail(ResultCode.FORBIDDEN.getCode(), "未授权访问"));
         }
-        
+
         return Result.fail(ResultCode.FORBIDDEN.getCode(), "未授权访问");
     }
 
@@ -89,14 +87,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoHandlerFoundException.class)
     public Object handleNoHandlerFoundException(NoHandlerFoundException e, NativeWebRequest request) {
         log.error("未找到处理器: {}", e.getRequestURL());
-        
+
         // 检查请求是否接受text/event-stream
         String acceptHeader = request.getHeader("Accept");
         if (acceptHeader != null && acceptHeader.contains(MediaType.TEXT_EVENT_STREAM_VALUE)) {
             // 对于SSE请求，返回错误信息
             return ResponseEntity.status(404).body(Result.fail(ResultCode.PARAM_ERROR.getCode(), "请求的资源不存在"));
         }
-        
+
         return Result.fail(ResultCode.PARAM_ERROR.getCode(), "请求的资源不存在");
     }
 
@@ -106,14 +104,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public Object handleException(Exception e, NativeWebRequest request) {
         log.error("系统异常: ", e);
-        
+
         // 检查请求是否接受text/event-stream
         String acceptHeader = request.getHeader("Accept");
         if (acceptHeader != null && acceptHeader.contains(MediaType.TEXT_EVENT_STREAM_VALUE)) {
             // 对于SSE请求，返回错误信息
             return ResponseEntity.status(500).body(Result.fail(ResultCode.SYSTEM_ERROR));
         }
-        
+
         return Result.fail(ResultCode.SYSTEM_ERROR);
     }
 }

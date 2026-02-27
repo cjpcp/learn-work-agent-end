@@ -7,10 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -88,19 +84,19 @@ public class TemplateService {
             // 添加请假信息
             addTableCell(table, "申请人ID：", labelFont);
             addTableCell(table, application.getApplicantId().toString(), contentFont);
-            
+
             addTableCell(table, "请假类型：", labelFont);
             addTableCell(table, LEAVE_TYPE_MAP.getOrDefault(application.getLeaveType(), application.getLeaveType()), contentFont);
-            
+
             addTableCell(table, "请假原因：", labelFont);
             addTableCell(table, application.getReason() != null ? application.getReason() : "无", contentFont);
-            
+
             addTableCell(table, "开始日期：", labelFont);
             addTableCell(table, application.getStartDate().format(DATE_FORMATTER), contentFont);
-            
+
             addTableCell(table, "结束日期：", labelFont);
             addTableCell(table, application.getEndDate().format(DATE_FORMATTER), contentFont);
-            
+
             addTableCell(table, "请假天数：", labelFont);
             addTableCell(table, application.getDays() + " 天", contentFont);
 
@@ -121,7 +117,7 @@ public class TemplateService {
 
             addTableCell(approvalTable, "审批状态：", labelFont);
             addTableCell(approvalTable, APPROVAL_STATUS_MAP.getOrDefault(application.getApprovalStatus(), application.getApprovalStatus()), contentFont);
-            
+
             if (application.getApprovalComment() != null) {
                 addTableCell(approvalTable, "审批意见：", labelFont);
                 addTableCell(approvalTable, application.getApprovalComment(), contentFont);
@@ -149,7 +145,7 @@ public class TemplateService {
 
             addTableCell(footerTable, "生成时间：", labelFont);
             addTableCell(footerTable, LocalDateTime.now().format(DATE_FORMATTER), contentFont);
-            
+
             addTableCell(footerTable, "生成编号：", labelFont);
             addTableCell(footerTable, application.getId().toString(), contentFont);
 
@@ -184,20 +180,5 @@ public class TemplateService {
         cell.setBorderColor(BaseColor.LIGHT_GRAY);
         cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
         table.addCell(cell);
-    }
-
-    /**
-     * 保存PDF文件到本地
-     *
-     * @param pdfBytes PDF字节数组
-     * @param filePath 文件路径
-     */
-    public void savePdfToFile(byte[] pdfBytes, String filePath) throws IOException {
-        Path path = Paths.get(filePath);
-        // 创建目录（如果不存在）
-        Files.createDirectories(path.getParent());
-        // 写入文件
-        Files.write(path, pdfBytes);
-        log.info("PDF文件保存成功：{}", filePath);
     }
 }
