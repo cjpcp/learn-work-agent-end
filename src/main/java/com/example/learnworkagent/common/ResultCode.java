@@ -35,6 +35,10 @@ public enum ResultCode {
     AI_SERVICE_TIMEOUT(3002, "AI服务调用超时"),
     AI_SERVICE_RATE_LIMIT(3003, "AI服务调用频率超限"),
 
+    // 通知相关 4000-4099
+    NOTIFICATION_NOT_FOUND(4001, "通知不存在"),
+    NOTIFICATION_SEND_FAILED(4002, "通知发送失败"),
+
     // 系统相关 9000-9999
     SYSTEM_ERROR(9000, "系统错误"),
     DATABASE_ERROR(9001, "数据库错误"),
