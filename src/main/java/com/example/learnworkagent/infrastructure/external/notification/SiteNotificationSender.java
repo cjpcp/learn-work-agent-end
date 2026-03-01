@@ -6,6 +6,7 @@ import com.example.learnworkagent.domain.notification.repository.NotificationRep
 import com.example.learnworkagent.domain.notification.service.NotificationSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
@@ -13,10 +14,16 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class SiteNotificationSender implements NotificationSender {
 
     private final NotificationRepository notificationRepository;
+    private final WebSocketNotificationService webSocketNotificationService;
+
+    public SiteNotificationSender(NotificationRepository notificationRepository,
+                                   @Lazy WebSocketNotificationService webSocketNotificationService) {
+        this.notificationRepository = notificationRepository;
+        this.webSocketNotificationService = webSocketNotificationService;
+    }
 
     @Override
     public String getChannel() {
@@ -38,6 +45,13 @@ public class SiteNotificationSender implements NotificationSender {
             notification.setChannel(getChannel());
 
             notificationRepository.save(notification);
+
+            // 通过WebSocket实时推送给前端
+            webSocketNotificationService.sendNotificationToUser(message.getUserId(), notification);
+
+            // 推送未读数量更新
+            long unreadCount = notificationRepository.countByUserIdAndIsReadFalseAndDeletedFalse(message.getUserId());
+            webSocketNotificationService.sendUnreadCountToUser(message.getUserId(), unreadCount);
 
             log.info("站内信通知发送成功，通知ID: {}", notification.getId());
             return true;

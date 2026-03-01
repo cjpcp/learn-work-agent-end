@@ -9,9 +9,10 @@ import com.example.learnworkagent.domain.notification.entity.NotificationMessage
 import com.example.learnworkagent.domain.notification.repository.NotificationRepository;
 import com.example.learnworkagent.domain.notification.service.NotificationService;
 import com.example.learnworkagent.infrastructure.config.RabbitMQConfig;
-import lombok.RequiredArgsConstructor;
+import com.example.learnworkagent.infrastructure.external.notification.WebSocketNotificationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -26,11 +27,19 @@ import java.util.List;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final RabbitTemplate rabbitTemplate;
+    private final WebSocketNotificationService webSocketNotificationService;
+
+    public NotificationServiceImpl(NotificationRepository notificationRepository,
+                                    RabbitTemplate rabbitTemplate,
+                                    @Lazy WebSocketNotificationService webSocketNotificationService) {
+        this.notificationRepository = notificationRepository;
+        this.rabbitTemplate = rabbitTemplate;
+        this.webSocketNotificationService = webSocketNotificationService;
+    }
 
     @Override
     public void sendAwardApprovalNotification(NotificationMessage message) {
@@ -76,6 +85,10 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setIsRead(true);
         notification.setReadTime(LocalDateTime.now());
         notificationRepository.save(notification);
+
+        // 推送未读数量更新
+        long unreadCount = notificationRepository.countByUserIdAndIsReadFalseAndDeletedFalse(userId);
+        webSocketNotificationService.sendUnreadCountToUser(userId, unreadCount);
     }
 
     @Override
@@ -91,6 +104,9 @@ public class NotificationServiceImpl implements NotificationService {
 
         notificationRepository.saveAll(unreadNotifications);
         log.info("用户 {} 标记所有通知为已读，共 {} 条", userId, unreadNotifications.size());
+
+        // 推送未读数量更新
+        webSocketNotificationService.sendUnreadCountToUser(userId, 0);
     }
 
     @Override
@@ -108,7 +124,14 @@ public class NotificationServiceImpl implements NotificationService {
             throw new BusinessException(ResultCode.FORBIDDEN, "无权删除此通知");
         }
 
+        boolean wasUnread = !notification.getIsRead();
         notification.setDeleted(true);
         notificationRepository.save(notification);
+
+        // 如果删除的是未读通知，推送未读数量更新
+        if (wasUnread) {
+            long unreadCount = notificationRepository.countByUserIdAndIsReadFalseAndDeletedFalse(userId);
+            webSocketNotificationService.sendUnreadCountToUser(userId, unreadCount);
+        }
     }
 }
