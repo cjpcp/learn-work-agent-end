@@ -243,4 +243,84 @@ public class TestController {
             return Result.fail("通知发送失败: " + e.getMessage());
         }
     }
+
+    /**
+     * 测试请假审批通过通知
+     *
+     * @param userId 用户ID
+     * @param email  邮箱
+     * @return 发送结果
+     */
+    @Operation(summary = "测试请假审批通过通知", description = "模拟请假申请审批通过的通知")
+    @GetMapping("/notification/leave-approved")
+    public Result<String> testLeaveApprovedNotification(
+            @RequestParam(defaultValue = "1") Long userId,
+            @RequestParam(defaultValue = "test@example.com") String email) {
+
+        log.info("测试请假审批通过通知，用户ID: {}", userId);
+
+        NotificationMessage message = NotificationMessage.builder()
+                .userId(userId)
+                .email(email)
+                .type("LEAVE_APPROVAL")
+                .title("请假申请审批结果通知")
+                .content("您的病假（2026-03-01至2026-03-03，共3天）申请已通过。审批意见：情况属实，同意请假。")
+                .businessId(1L)
+                .businessType("LEAVE_APPLICATION")
+                .channels(Arrays.asList("SITE", "EMAIL"))
+                .applicantName("测试用户")
+                .applicationType("SICK")
+                .approvalStatus("APPROVED")
+                .approvalComment("情况属实，同意请假")
+                .approverName("辅导员李老师")
+                .build();
+
+        try {
+            notificationService.sendAwardApprovalNotification(message);
+            return Result.success("请假审批通过通知已发送", "请查看日志确认发送结果");
+        } catch (Exception e) {
+            log.error("通知发送失败", e);
+            return Result.fail("通知发送失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 测试请假审批拒绝通知
+     *
+     * @param userId 用户ID
+     * @param email  邮箱
+     * @return 发送结果
+     */
+    @Operation(summary = "测试请假审批拒绝通知", description = "模拟请假申请审批拒绝的通知")
+    @GetMapping("/notification/leave-rejected")
+    public Result<String> testLeaveRejectedNotification(
+            @RequestParam(defaultValue = "1") Long userId,
+            @RequestParam(defaultValue = "test@example.com") String email) {
+
+        log.info("测试请假审批拒绝通知，用户ID: {}", userId);
+
+        NotificationMessage message = NotificationMessage.builder()
+                .userId(userId)
+                .email(email)
+                .type("LEAVE_APPROVAL")
+                .title("请假申请审批结果通知")
+                .content("您的事假（2026-03-05至2026-03-07，共3天）申请未通过。审批意见：请假时间过长，请提供更详细的请假理由。")
+                .businessId(2L)
+                .businessType("LEAVE_APPLICATION")
+                .channels(Arrays.asList("SITE", "EMAIL"))
+                .applicantName("测试用户")
+                .applicationType("PERSONAL")
+                .approvalStatus("REJECTED")
+                .approvalComment("请假时间过长，请提供更详细的请假理由")
+                .approverName("辅导员王老师")
+                .build();
+
+        try {
+            notificationService.sendAwardApprovalNotification(message);
+            return Result.success("请假审批拒绝通知已发送", "请查看日志确认发送结果");
+        } catch (Exception e) {
+            log.error("通知发送失败", e);
+            return Result.fail("通知发送失败: " + e.getMessage());
+        }
+    }
 }

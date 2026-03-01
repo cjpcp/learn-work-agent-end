@@ -6,6 +6,10 @@ import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.repository.LeaveApplicationRepository;
+import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
+import com.example.learnworkagent.domain.notification.service.NotificationService;
+import com.example.learnworkagent.domain.user.entity.User;
+import com.example.learnworkagent.domain.user.repository.UserRepository;
 import com.example.learnworkagent.infrastructure.external.oss.OssService;
 import com.example.learnworkagent.infrastructure.external.template.TemplateService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +29,7 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 
 /**
  * 请假申请服务
@@ -37,6 +42,8 @@ public class LeaveApplicationService {
     private final LeaveApplicationRepository leaveApplicationRepository;
     private final TemplateService templateService;
     private final OssService ossService;
+    private final NotificationService notificationService;
+    private final UserRepository userRepository;
 
     /**
      * 提交请假申请
@@ -95,7 +102,82 @@ public class LeaveApplicationService {
             generateLeaveSlip(applicationId);
         }
 
-        // TODO: 发送审批结果通知（通过消息队列）
+        // 发送审批结果通知（多渠道推送）
+        sendApprovalNotification(application, approverId);
+    }
+
+    /**
+     * 发送审批结果通知
+     *
+     * @param application 请假申请
+     * @param approverId  审批人ID
+     */
+    private void sendApprovalNotification(LeaveApplication application, Long approverId) {
+        try {
+            // 获取申请人信息
+            User applicant = userRepository.findById(application.getApplicantId())
+                    .orElse(null);
+
+            // 获取审批人信息
+            User approver = userRepository.findById(approverId)
+                    .orElse(null);
+
+            if (applicant == null) {
+                log.warn("申请人不存在，无法发送通知，用户ID: {}", application.getApplicantId());
+                return;
+            }
+
+            // 构建通知消息
+            String statusText = "APPROVED".equals(application.getApprovalStatus()) ? "已通过" : "未通过";
+            String title = "请假申请审批结果通知";
+            String content = String.format("您的%s（%s至%s，共%d天）申请%s。审批意见：%s",
+                    getLeaveTypeName(application.getLeaveType()),
+                    application.getStartDate(),
+                    application.getEndDate(),
+                    application.getDays(),
+                    statusText,
+                    application.getApprovalComment());
+
+            NotificationMessage message = NotificationMessage.builder()
+                    .userId(application.getApplicantId())
+                    .email(applicant.getEmail())
+                    .type("LEAVE_APPROVAL")
+                    .title(title)
+                    .content(content)
+                    .businessId(application.getId())
+                    .businessType("LEAVE_APPLICATION")
+                    .channels(Arrays.asList("SITE", "EMAIL"))
+                    .applicantName(applicant.getRealName())
+                    .applicationType(application.getLeaveType())
+                    .approvalStatus(application.getApprovalStatus())
+                    .approvalComment(application.getApprovalComment())
+                    .approverName(approver != null ? approver.getRealName() : "系统")
+                    .build();
+
+            // 发送通知
+            notificationService.sendAwardApprovalNotification(message);
+
+            log.info("请假审批结果通知已发送，申请ID: {}, 用户ID: {}",
+                    application.getId(), application.getApplicantId());
+        } catch (Exception e) {
+            log.error("发送请假审批结果通知失败，申请ID: {}", application.getId(), e);
+            // 通知发送失败不影响主流程
+        }
+    }
+
+    /**
+     * 获取请假类型名称
+     *
+     * @param leaveType 请假类型代码
+     * @return 请假类型名称
+     */
+    private String getLeaveTypeName(String leaveType) {
+        return switch (leaveType) {
+            case "SICK" -> "病假";
+            case "PERSONAL" -> "事假";
+            case "OFFICIAL" -> "公假";
+            default -> "请假";
+        };
     }
 
     /**
