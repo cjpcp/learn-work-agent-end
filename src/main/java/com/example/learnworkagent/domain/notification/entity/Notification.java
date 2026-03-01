@@ -1,6 +1,7 @@
 package com.example.learnworkagent.domain.notification.entity;
 
 import com.example.learnworkagent.common.BaseEntity;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -43,6 +44,7 @@ public class Notification extends BaseEntity {
     /**
      * 是否已读
      */
+    @JsonProperty("isRead")
     @Column(name = "is_read", nullable = false)
     private Boolean isRead = false;
 

@@ -1,6 +1,8 @@
 package com.example.learnworkagent.infrastructure.filter;
 
 import com.example.learnworkagent.common.util.JwtUtil;
+import com.example.learnworkagent.domain.user.entity.User;
+import com.example.learnworkagent.domain.user.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Optional;
 
 /**
  * JWT认证过滤器
@@ -27,6 +30,7 @@ import java.util.Collections;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
@@ -51,14 +55,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String role = jwtUtil.getRoleFromToken(token);
 
                 if (userId != null && username != null) {
-                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            userId,
-                            username,
-                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
-                    );
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                    log.debug("JWT认证成功: userId={}, username={}, role={}", userId, username, role);
+                    Optional<User> userOpt = userRepository.findById(userId);
+                    if (userOpt.isPresent()) {
+                        User user = userOpt.get();
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                user,
+                                null,
+                                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
+                        );
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        log.debug("JWT认证成功: userId={}, username={}, role={}", userId, username, role);
+                    } else {
+                        log.warn("用户不存在: userId={}", userId);
+                    }
                 }
             } catch (Exception e) {
                 log.error("JWT认证失败: {} {}", method, requestUri, e);

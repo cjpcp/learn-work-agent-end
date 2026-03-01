@@ -20,7 +20,7 @@ import java.util.Map;
  * 通知控制器
  */
 @RestController
-@RequestMapping("/api/notifications")
+@RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
 @Tag(name = "通知管理", description = "通知相关接口")
 public class NotificationController {
