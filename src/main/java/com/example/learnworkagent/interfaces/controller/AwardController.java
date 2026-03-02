@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,6 +22,7 @@ import java.util.List;
 /**
  * 奖助管理控制器
  */
+@Slf4j
 @Tag(name = "奖助管理", description = "奖助申请、审批等相关接口")
 @RestController
 @RequestMapping("/api/v1/award")
@@ -74,6 +76,7 @@ public class AwardController extends BaseController {
     @GetMapping("/applications/my")
     public Result<PageResult<AwardApplication>> getMyApplications(@Valid PageRequest pageRequest) {
         Long userId = getCurrentUserId();
+        log.info("用户id:{}",userId);
         PageResult<AwardApplication> result = awardApplicationService.getUserApplications(userId, pageRequest);
         return Result.success(result);
     }

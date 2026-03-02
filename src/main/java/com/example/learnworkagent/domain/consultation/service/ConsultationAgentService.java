@@ -63,22 +63,41 @@ public class ConsultationAgentService {
                 return;
             }
 
-            // 调用AI服务获取答案
+            // 根据问题类型调用相应的AI服务
             String prompt = buildPrompt(question);
-            qianwenApiClient.generateText(prompt)
-                    .subscribe(
-                            answer -> {
-                                // 缓存答案
-                                cacheAnswer(question, answer);
-                                // 更新问题答案
-                                self.updateQuestionAnswer(question, answer, "AI");
-                            },
-                            error -> {
-                                log.error("AI服务调用失败，问题ID: {}", questionId, error);
-                                // AI服务失败，转人工
-                                self.transferToHuman(question);
-                            }
-                    );
+            if ("IMAGE".equals(question.getQuestionType()) && question.getImageUrl() != null) {
+                // 处理图片类型问题
+                qianwenApiClient.generateMultimodal(prompt, question.getImageUrl())
+                        .subscribe(
+                                answer -> {
+                                    // 缓存答案
+                                    cacheAnswer(question, answer);
+                                    // 更新问题答案
+                                    self.updateQuestionAnswer(question, answer, "AI");
+                                },
+                                error -> {
+                                    log.error("AI服务调用失败，问题ID: {}", questionId, error);
+                                    // AI服务失败，转人工
+                                    self.transferToHuman(question);
+                                }
+                        );
+            } else {
+                // 处理文本或语音类型问题
+                qianwenApiClient.generateText(prompt)
+                        .subscribe(
+                                answer -> {
+                                    // 缓存答案
+                                    cacheAnswer(question, answer);
+                                    // 更新问题答案
+                                    self.updateQuestionAnswer(question, answer, "AI");
+                                },
+                                error -> {
+                                    log.error("AI服务调用失败，问题ID: {}", questionId, error);
+                                    // AI服务失败，转人工
+                                    self.transferToHuman(question);
+                                }
+                        );
+            }
 
             CompletableFuture.completedFuture(null);
         } catch (Exception e) {
@@ -200,30 +219,60 @@ public class ConsultationAgentService {
                     //咨询ai返回结果
                     String prompt = buildPrompt(question);
                     log.info("调用千问AI，问题ID: {}, prompt: {}", questionId, prompt);
-                    return qianwenApiClient.generateTextStream(prompt)
-                            //所有数据发送完成时的回调函数
-                            .doOnComplete(() -> {
-                                log.info("千问API调用完成，问题ID: {}", questionId);
-                                //使用专门的线程池来处理阻塞任务
-                                Mono.fromRunnable(() -> {
-                                            question.setStatus("ANSWERED");
-                                            question.setAnswerSource("AI");
-                                            //保存到数据库可能陷入阻塞
-                                            consultationQuestionRepository.save(question);
-                                        })
-                                        .subscribeOn(Schedulers.boundedElastic())  // 使用专门的阻塞线程池
-                                        .doOnError(error -> log.error("保存AI回答失败，问题ID: {}", questionId, error))
-                                        .subscribe();
-                            })
-                            //当发送过程中发生错误时的回调函数
-                            .doOnError(error -> {
-                                log.error("AI服务调用失败，问题ID: {}", questionId, error);
-                                // 保存到数据库可能陷入阻塞
-                                Mono.fromRunnable(() -> self.transferToHuman(question))
-                                        .subscribeOn(Schedulers.boundedElastic())
-                                        .doOnError(transferError -> log.error("转人工处理失败，问题ID: {}", questionId, transferError))
-                                        .subscribe();
-                            });
+                    
+                    if ("IMAGE".equals(question.getQuestionType()) && question.getImageUrl() != null) {
+                        // 处理图片类型问题
+                        return qianwenApiClient.generateMultimodalStream(prompt, question.getImageUrl())
+                                //所有数据发送完成时的回调函数
+                                .doOnComplete(() -> {
+                                    log.info("千问多模态API调用完成，问题ID: {}", questionId);
+                                    //使用专门的线程池来处理阻塞任务
+                                    Mono.fromRunnable(() -> {
+                                                question.setStatus("ANSWERED");
+                                                question.setAnswerSource("AI");
+                                                //保存到数据库可能陷入阻塞
+                                                consultationQuestionRepository.save(question);
+                                            })
+                                            .subscribeOn(Schedulers.boundedElastic())  // 使用专门的阻塞线程池
+                                            .doOnError(error -> log.error("保存AI回答失败，问题ID: {}", questionId, error))
+                                            .subscribe();
+                                })
+                                //当发送过程中发生错误时的回调函数
+                                .doOnError(error -> {
+                                    log.error("AI服务调用失败，问题ID: {}", questionId, error);
+                                    // 保存到数据库可能陷入阻塞
+                                    Mono.fromRunnable(() -> self.transferToHuman(question))
+                                            .subscribeOn(Schedulers.boundedElastic())
+                                            .doOnError(transferError -> log.error("转人工处理失败，问题ID: {}", questionId, transferError))
+                                            .subscribe();
+                                });
+                    } else {
+                        // 处理文本或语音类型问题
+                        return qianwenApiClient.generateTextStream(prompt)
+                                //所有数据发送完成时的回调函数
+                                .doOnComplete(() -> {
+                                    log.info("千问API调用完成，问题ID: {}", questionId);
+                                    //使用专门的线程池来处理阻塞任务
+                                    Mono.fromRunnable(() -> {
+                                                question.setStatus("ANSWERED");
+                                                question.setAnswerSource("AI");
+                                                //保存到数据库可能陷入阻塞
+                                                consultationQuestionRepository.save(question);
+                                            })
+                                            .subscribeOn(Schedulers.boundedElastic())  // 使用专门的阻塞线程池
+                                            .doOnError(error -> log.error("保存AI回答失败，问题ID: {}", questionId, error))
+                                            .subscribe();
+                                })
+                                //当发送过程中发生错误时的回调函数
+                                .doOnError(error -> {
+                                    log.error("AI服务调用失败，问题ID: {}", questionId, error);
+                                    // 保存到数据库可能陷入阻塞
+                                    Mono.fromRunnable(() -> self.transferToHuman(question))
+                                            .subscribeOn(Schedulers.boundedElastic())
+                                            .doOnError(transferError -> log.error("转人工处理失败，问题ID: {}", questionId, transferError))
+                                            .subscribe();
+                                });
+                    }
                 });
     }
 

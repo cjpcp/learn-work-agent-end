@@ -31,9 +31,6 @@ public class QianwenApiClient {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
-    @Value("${ai.qianwen.base-url:https://dashscope.aliyuncs.com}")
-    private String baseUrl;
-
     @Value("${ai.qianwen.api-url:/compatible-mode/v1/chat/completions}")
     private String apiUrl;
 
@@ -96,7 +93,7 @@ public class QianwenApiClient {
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofSeconds(1))
                         .filter(throwable -> throwable instanceof TimeoutException || throwable instanceof WebClientException)
                         .doBeforeRetry(retrySignal -> log.warn("重试AI API调用，第{}次", retrySignal.totalRetries() + 1)))
-                .map(response -> {
+                .<String>handle((response, sink) -> {
                     log.info("千问API响应: {}", response);
                     if (response != null && response.containsKey("choices")) {
                         @SuppressWarnings("unchecked")
@@ -107,12 +104,13 @@ public class QianwenApiClient {
                                 @SuppressWarnings("unchecked")
                                 Map<String, Object> messageObj = (Map<String, Object>) choice.get("message");
                                 if (messageObj != null && messageObj.containsKey("content")) {
-                                    return (String) messageObj.get("content");
+                                    sink.next((String) messageObj.get("content"));
+                                    return;
                                 }
                             }
                         }
                     }
-                    throw new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务响应格式错误");
+                    sink.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务响应格式错误"));
                 })
                 .doOnError(error -> log.error("调用千问API失败", error))
                 .onErrorResume(error -> {
@@ -163,6 +161,126 @@ public class QianwenApiClient {
     }
 
     /**
+     * 调用千问API进行多模态生成（支持图片）
+     */
+    public Mono<String> generateMultimodal(String prompt, String imageUrl) {
+        if (apiKey == null || apiKey.isEmpty()) {
+            log.warn("千问API Key未配置");
+            return Mono.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务未配置"));
+        }
+
+        Map<String, Object> textContent = new HashMap<>();
+        textContent.put("type", "text");
+        textContent.put("text", prompt);
+
+        Map<String, Object> imageUrlContent = new HashMap<>();
+        imageUrlContent.put("type", "image_url");
+
+        Map<String, String> imageUrlObj = new HashMap<>();
+        imageUrlObj.put("url", imageUrl);
+        imageUrlContent.put("image_url", imageUrlObj);
+
+        Map<String, Object> message = new HashMap<>();
+        message.put("role", "user");
+        message.put("content", List.of(textContent, imageUrlContent));
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("enable_search", false);
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "qwen-vl-plus");
+        requestBody.put("messages", List.of(message));
+        requestBody.put("stream", false);
+        requestBody.put("parameters", parameters);
+
+        return webClient.post()
+                .uri(apiUrl)
+                .header("Authorization", "Bearer " + apiKey)
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .timeout(Duration.ofMillis(timeout))
+                .retryWhen(Retry.backoff(maxRetries, Duration.ofSeconds(1))
+                        .filter(throwable -> throwable instanceof TimeoutException || throwable instanceof WebClientException)
+                        .doBeforeRetry(retrySignal -> log.warn("重试AI API调用，第{}次", retrySignal.totalRetries() + 1)))
+                .map(response -> {
+                    log.info("千问多模态API响应: {}", response);
+                    if (response != null && response.containsKey("choices")) {
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+                        if (choices != null && !choices.isEmpty()) {
+                            Map<String, Object> choice = choices.get(0);
+                            if (choice.containsKey("message")) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> messageObj = (Map<String, Object>) choice.get("message");
+                                if (messageObj != null && messageObj.containsKey("content")) {
+                                    return (String) messageObj.get("content");
+                                }
+                            }
+                        }
+                    }
+                    throw new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务响应格式错误");
+                })
+                .doOnError(error -> log.error("调用千问多模态API失败", error))
+                .onErrorResume(error -> {
+                    if (error instanceof BusinessException) {
+                        return Mono.error(error);
+                    }
+                    return Mono.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务调用失败: " + error.getMessage()));
+                });
+    }
+
+    /**
+     * 调用千问API进行多模态生成（流式，支持图片）
+     */
+    public Flux<String> generateMultimodalStream(String prompt, String imageUrl) {
+        if (apiKey == null || apiKey.isEmpty()) {
+            log.warn("千问API Key未配置");
+            return Flux.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务未配置"));
+        }
+
+        Map<String, Object> textContent = new HashMap<>();
+        textContent.put("type", "text");
+        textContent.put("text", prompt);
+
+        Map<String, Object> imageUrlContent = new HashMap<>();
+        imageUrlContent.put("type", "image_url");
+
+        Map<String, String> imageUrlObj = new HashMap<>();
+        imageUrlObj.put("url", imageUrl);
+        imageUrlContent.put("image_url", imageUrlObj);
+
+        Map<String, Object> message = new HashMap<>();
+        message.put("role", "user");
+        message.put("content", List.of(textContent, imageUrlContent));
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "qwen-vl-plus");
+        requestBody.put("messages", List.of(message));
+        requestBody.put("stream", true);
+
+        return webClient.post()
+                .uri(apiUrl)
+                .header("Authorization", "Bearer " + apiKey)
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .timeout(Duration.ofMillis(timeout))
+                .retryWhen(Retry.backoff(maxRetries, Duration.ofSeconds(1))
+                        .filter(throwable -> throwable instanceof TimeoutException || throwable instanceof WebClientException)
+                        .doBeforeRetry(retrySignal -> log.warn("重试AI API调用，第{}次", retrySignal.totalRetries() + 1)))
+                .flatMap(this::parseStreamChunk)
+                .filter(content -> !content.isEmpty())
+                .doOnError(error -> log.error("调用千问多模态API失败", error))
+                .onErrorResume(error -> {
+                    if (error instanceof BusinessException) {
+                        return Flux.error(error);
+                    }
+                    return Flux.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务调用失败: " + error.getMessage()));
+                });
+    }
+
+    /**
      * 解析流式响应块
      */
     private Flux<String> parseStreamChunk(String chunk) {
@@ -174,12 +292,15 @@ public class QianwenApiClient {
                 log.info(line);
                 line = line.trim();
                 try {
+                    @SuppressWarnings("unchecked")
                     Map<String, Object> response = objectMapper.readValue(line, Map.class);
                     if (response.containsKey("choices")) {
+                        @SuppressWarnings("unchecked")
                         List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
                         if (choices != null && !choices.isEmpty()) {
                             Map<String, Object> choice = choices.get(0);
                             if (choice.containsKey("delta")) {
+                                @SuppressWarnings("unchecked")
                                 Map<String, Object> delta = (Map<String, Object>) choice.get("delta");
                                 if (delta != null && delta.containsKey("content")) {
                                     String content = (String) delta.get("content");

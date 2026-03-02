@@ -104,4 +104,16 @@ public class OssService {
     public String uploadAwardFile(MultipartFile file, Long userId) {
         return uploadFile(file, "award-applications/" + userId);
     }
+
+    /**
+     * 上传咨询相关文件（图片或语音）
+     *
+     * @param file 上传的文件
+     * @param userId 用户ID
+     * @param fileType 文件类型（image或voice）
+     * @return 文件在OSS上的URL
+     */
+    public String uploadConsultationFile(MultipartFile file, Long userId, String fileType) {
+        return uploadFile(file, "consultation/" + fileType + "/" + userId);
+    }
 }

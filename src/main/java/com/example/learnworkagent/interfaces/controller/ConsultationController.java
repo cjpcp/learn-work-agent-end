@@ -8,6 +8,7 @@ import com.example.learnworkagent.domain.consultation.dto.TransferToHumanRequest
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
 import com.example.learnworkagent.domain.consultation.service.ConsultationService;
 import com.example.learnworkagent.domain.consultation.service.HumanTransferService;
+import com.example.learnworkagent.infrastructure.external.oss.OssService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
@@ -33,6 +35,7 @@ public class ConsultationController extends BaseController {
 
     private final ConsultationService consultationService;
     private final HumanTransferService humanTransferService;
+    private final OssService ossService;
 
     @Operation(summary = "提交咨询问题")
     @PostMapping("/questions")
@@ -206,6 +209,22 @@ public class ConsultationController extends BaseController {
         );
 
         return emitter;
+    }
+
+    @Operation(summary = "上传咨询图片")
+    @PostMapping(value = "/upload/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<String> uploadImage(@RequestParam("file") MultipartFile file) {
+        Long userId = getCurrentUserId();
+        String imageUrl = ossService.uploadConsultationFile(file, userId, "image");
+        return Result.success(imageUrl);
+    }
+
+    @Operation(summary = "上传咨询语音")
+    @PostMapping(value = "/upload/voice", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<String> uploadVoice(@RequestParam("file") MultipartFile file) {
+        Long userId = getCurrentUserId();
+        String voiceUrl = ossService.uploadConsultationFile(file, userId, "voice");
+        return Result.success(voiceUrl);
     }
 
     //todo 转人工后的人工操作
