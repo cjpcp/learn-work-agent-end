@@ -12,6 +12,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SynchronousSink;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
@@ -53,20 +54,63 @@ public class QianwenApiClient {
     }
 
     /**
+     * 封装文本消息
+     */
+    private Map<String, Object> buildTextMessage(String prompt) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("role", "user");
+        message.put("content", prompt);
+        return message;
+    }
+
+    /**
+     * 封装多模态消息
+     */
+    private Map<String, Object> buildMultimodalMessage(String prompt, String imageUrl) {
+        Map<String, Object> textContent = new HashMap<>();
+        textContent.put("type", "text");
+        textContent.put("text", prompt);
+
+        Map<String, Object> imageUrlContent = new HashMap<>();
+        imageUrlContent.put("type", "image_url");
+
+        Map<String, String> imageUrlObj = new HashMap<>();
+        imageUrlObj.put("url", imageUrl);
+        imageUrlContent.put("image_url", imageUrlObj);
+
+        Map<String, Object> message = new HashMap<>();
+        message.put("role", "user");
+        message.put("content", List.of(textContent, imageUrlContent));
+        return message;
+    }
+
+    /**
+     * 封装请求体
+     */
+    private Map<String, Object> buildRequestBody(String model, List<Map<String, Object>> messages, boolean stream, Map<String, Object> parameters) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", model);
+        requestBody.put("messages", messages);
+        requestBody.put("stream", stream);
+        if (parameters != null) {
+            requestBody.put("parameters", parameters);
+        }
+        return requestBody;
+    }
+
+    /**
      * 调用千问API进行文本生成（非流式）
      */
     public Mono<String> generateText(String prompt) {
 
         //检测APIKey是否为空
         if (apiKey == null || apiKey.isEmpty()) {
-            log.warn("千问API Key未配置");
+            log.warn("调用千问API进行文本生成（非流式）时，千问API Key未配置");
             return Mono.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务未配置"));
         }
 
         //封装用户参数
-        Map<String, Object> message = new HashMap<>();
-        message.put("role", "user");
-        message.put("content", prompt);
+        Map<String, Object> message = buildTextMessage(prompt);
 
         //封装是否流式输出等参数
         Map<String, Object> parameters = new HashMap<>();
@@ -75,11 +119,7 @@ public class QianwenApiClient {
         parameters.put("incremental_output", true);
 
         //封装总的请求参数
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "qwen-plus");
-        requestBody.put("messages", List.of(message));
-        requestBody.put("stream", false);
-        requestBody.put("parameters", parameters);
+        Map<String, Object> requestBody = buildRequestBody("qwen-plus", List.of(message), false, parameters);
 
         //发送请求并返回返回值
         return webClient.post()
@@ -92,25 +132,10 @@ public class QianwenApiClient {
                 .timeout(Duration.ofMillis(timeout))
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofSeconds(1))
                         .filter(throwable -> throwable instanceof TimeoutException || throwable instanceof WebClientException)
-                        .doBeforeRetry(retrySignal -> log.warn("重试AI API调用，第{}次", retrySignal.totalRetries() + 1)))
+                        .doBeforeRetry(retrySignal -> log.warn("调用千问API进行文本生成（非流式）时，重试AI API调用，第{}次", retrySignal.totalRetries() + 1)))
                 .<String>handle((response, sink) -> {
                     log.info("千问API响应: {}", response);
-                    if (response != null && response.containsKey("choices")) {
-                        @SuppressWarnings("unchecked")
-                        List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-                        if (choices != null && !choices.isEmpty()) {
-                            Map<String, Object> choice = choices.get(0);
-                            if (choice.containsKey("message")) {
-                                @SuppressWarnings("unchecked")
-                                Map<String, Object> messageObj = (Map<String, Object>) choice.get("message");
-                                if (messageObj != null && messageObj.containsKey("content")) {
-                                    sink.next((String) messageObj.get("content"));
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                    sink.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务响应格式错误"));
+                    extractResponseInfo(response, sink);
                 })
                 .doOnError(error -> log.error("调用千问API失败", error))
                 .onErrorResume(error -> {
@@ -121,23 +146,36 @@ public class QianwenApiClient {
                 });
     }
 
+    private void extractResponseInfo(Map response, SynchronousSink<String> sink) {
+        if (response != null && response.containsKey("choices")) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+            if (choices != null && !choices.isEmpty()) {
+                Map<String, Object> choice = choices.get(0);
+                if (choice.containsKey("message")) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> messageObj = (Map<String, Object>) choice.get("message");
+                    if (messageObj != null && messageObj.containsKey("content")) {
+                        sink.next((String) messageObj.get("content"));
+                        return;
+                    }
+                }
+            }
+        }
+        sink.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务响应格式错误"));
+    }
+
     /**
      * 调用千问API进行文本生成（流式）
      */
     public Flux<String> generateTextStream(String prompt) {
         if (apiKey == null || apiKey.isEmpty()) {
-            log.warn("千问API Key未配置");
+            log.warn("调用千问API进行文本生成（流式）时，千问API Key未配置");
             return Flux.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务未配置"));
         }
 
-        Map<String, Object> message = new HashMap<>();
-        message.put("role", "user");
-        message.put("content", prompt);
-
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "qwen-plus");
-        requestBody.put("messages", List.of(message));
-        requestBody.put("stream", true);
+        Map<String, Object> message = buildTextMessage(prompt);
+        Map<String, Object> requestBody = buildRequestBody("qwen-plus", List.of(message), true, null);
 
         return webClient.post()
                 .uri(apiUrl)
@@ -148,7 +186,7 @@ public class QianwenApiClient {
                 .timeout(Duration.ofMillis(timeout))
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofSeconds(1))
                         .filter(throwable -> throwable instanceof TimeoutException || throwable instanceof WebClientException)
-                        .doBeforeRetry(retrySignal -> log.warn("重试AI API调用，第{}次", retrySignal.totalRetries() + 1)))
+                        .doBeforeRetry(retrySignal -> log.warn("调用千问API进行文本生成（流式）时，重试AI API调用，第{}次", retrySignal.totalRetries() + 1)))
                 .flatMap(this::parseStreamChunk)
                 .filter(content -> !content.isEmpty())
                 .doOnError(error -> log.error("调用千问API失败", error))
@@ -169,29 +207,12 @@ public class QianwenApiClient {
             return Mono.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务未配置"));
         }
 
-        Map<String, Object> textContent = new HashMap<>();
-        textContent.put("type", "text");
-        textContent.put("text", prompt);
-
-        Map<String, Object> imageUrlContent = new HashMap<>();
-        imageUrlContent.put("type", "image_url");
-
-        Map<String, String> imageUrlObj = new HashMap<>();
-        imageUrlObj.put("url", imageUrl);
-        imageUrlContent.put("image_url", imageUrlObj);
-
-        Map<String, Object> message = new HashMap<>();
-        message.put("role", "user");
-        message.put("content", List.of(textContent, imageUrlContent));
+        Map<String, Object> message = buildMultimodalMessage(prompt, imageUrl);
 
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("enable_search", false);
 
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "qwen-vl-plus");
-        requestBody.put("messages", List.of(message));
-        requestBody.put("stream", false);
-        requestBody.put("parameters", parameters);
+        Map<String, Object> requestBody = buildRequestBody("qwen-vl-plus", List.of(message), false, parameters);
 
         return webClient.post()
                 .uri(apiUrl)
@@ -203,23 +224,9 @@ public class QianwenApiClient {
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofSeconds(1))
                         .filter(throwable -> throwable instanceof TimeoutException || throwable instanceof WebClientException)
                         .doBeforeRetry(retrySignal -> log.warn("重试AI API调用，第{}次", retrySignal.totalRetries() + 1)))
-                .map(response -> {
+                .<String>handle((response, sink) -> {
                     log.info("千问多模态API响应: {}", response);
-                    if (response != null && response.containsKey("choices")) {
-                        @SuppressWarnings("unchecked")
-                        List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-                        if (choices != null && !choices.isEmpty()) {
-                            Map<String, Object> choice = choices.get(0);
-                            if (choice.containsKey("message")) {
-                                @SuppressWarnings("unchecked")
-                                Map<String, Object> messageObj = (Map<String, Object>) choice.get("message");
-                                if (messageObj != null && messageObj.containsKey("content")) {
-                                    return (String) messageObj.get("content");
-                                }
-                            }
-                        }
-                    }
-                    throw new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务响应格式错误");
+                    extractResponseInfo(response, sink);
                 })
                 .doOnError(error -> log.error("调用千问多模态API失败", error))
                 .onErrorResume(error -> {
@@ -235,29 +242,12 @@ public class QianwenApiClient {
      */
     public Flux<String> generateMultimodalStream(String prompt, String imageUrl) {
         if (apiKey == null || apiKey.isEmpty()) {
-            log.warn("千问API Key未配置");
+            log.warn("调用千问API进行多模态生成（流式，支持图片）时，千问API Key未配置");
             return Flux.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI服务未配置"));
         }
 
-        Map<String, Object> textContent = new HashMap<>();
-        textContent.put("type", "text");
-        textContent.put("text", prompt);
-
-        Map<String, Object> imageUrlContent = new HashMap<>();
-        imageUrlContent.put("type", "image_url");
-
-        Map<String, String> imageUrlObj = new HashMap<>();
-        imageUrlObj.put("url", imageUrl);
-        imageUrlContent.put("image_url", imageUrlObj);
-
-        Map<String, Object> message = new HashMap<>();
-        message.put("role", "user");
-        message.put("content", List.of(textContent, imageUrlContent));
-
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "qwen-vl-plus");
-        requestBody.put("messages", List.of(message));
-        requestBody.put("stream", true);
+        Map<String, Object> message = buildMultimodalMessage(prompt, imageUrl);
+        Map<String, Object> requestBody = buildRequestBody("qwen-vl-plus", List.of(message), true, null);
 
         return webClient.post()
                 .uri(apiUrl)
@@ -268,7 +258,7 @@ public class QianwenApiClient {
                 .timeout(Duration.ofMillis(timeout))
                 .retryWhen(Retry.backoff(maxRetries, Duration.ofSeconds(1))
                         .filter(throwable -> throwable instanceof TimeoutException || throwable instanceof WebClientException)
-                        .doBeforeRetry(retrySignal -> log.warn("重试AI API调用，第{}次", retrySignal.totalRetries() + 1)))
+                        .doBeforeRetry(retrySignal -> log.warn("调用千问API进行多模态生成（流式，支持图片）时，重试AI API调用，第{}次", retrySignal.totalRetries() + 1)))
                 .flatMap(this::parseStreamChunk)
                 .filter(content -> !content.isEmpty())
                 .doOnError(error -> log.error("调用千问多模态API失败", error))

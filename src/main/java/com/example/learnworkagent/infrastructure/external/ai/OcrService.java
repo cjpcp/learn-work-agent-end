@@ -121,7 +121,7 @@ public class OcrService {
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToMono(Map.class)
-                .map(response -> {
+                .<String>handle((response, sink) -> {
                     log.info("千问 OCR API 响应: {}", response);
                     if (response != null && response.containsKey("choices")) {
                         @SuppressWarnings("unchecked")
@@ -133,16 +133,16 @@ public class OcrService {
                                 Map<String, Object> messageObj = (Map<String, Object>) choice.get("message");
                                 if (messageObj != null && messageObj.containsKey("content")) {
                                     String content = (String) messageObj.get("content");
-                                    return content.trim();
+                                    sink.next(content.trim());
+                                    return;
                                 }
                             }
                         }
                     }
-                    throw new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI 服务响应格式错误");
+                    sink.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, "AI 服务响应格式错误"));
                 })
                 .doOnError(error -> {
-                    if (error instanceof WebClientResponseException) {
-                        WebClientResponseException wcre = (WebClientResponseException) error;
+                    if (error instanceof WebClientResponseException wcre) {
                         log.error("调用千问 OCR API 失败 - 状态码: {}, 响应体: {}",
                                 wcre.getStatusCode(), wcre.getResponseBodyAsString());
                     } else {
@@ -153,8 +153,7 @@ public class OcrService {
                     if (error instanceof BusinessException) {
                         return Mono.error(error);
                     }
-                    if (error instanceof WebClientResponseException) {
-                        WebClientResponseException wcre = (WebClientResponseException) error;
+                    if (error instanceof WebClientResponseException wcre) {
                         String errorMsg = "OCR 服务调用失败 - 状态码: " + wcre.getStatusCode() +
                                 ", 响应: " + wcre.getResponseBodyAsString();
                         return Mono.error(new BusinessException(ResultCode.AI_SERVICE_ERROR, errorMsg));
