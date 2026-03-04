@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
@@ -69,13 +68,13 @@ public class DifyFileUploadService {
             byte[] fileBytes = file.getBytes();
             String filename = file.getOriginalFilename();
             String contentType = file.getContentType();
-            
+
             if (contentType == null) {
                 contentType = "application/octet-stream";
             }
 
             MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
-            
+
             DataBuffer dataBuffer = new DefaultDataBufferFactory().wrap(fileBytes);
             org.springframework.core.io.Resource resource = DataBufferUtils.join(Mono.just(dataBuffer))
                     .map(buffer -> {
@@ -90,10 +89,14 @@ public class DifyFileUploadService {
                         };
                     }).block();
 
-            bodyBuilder.part("file", resource)
-                    .filename(filename)
-                    .contentType(MediaType.parseMediaType(contentType));
-            
+            if (filename != null) {
+                if (resource != null) {
+                    bodyBuilder.part("file", resource)
+                            .filename(filename)
+                            .contentType(MediaType.parseMediaType(contentType));
+                }
+            }
+
             bodyBuilder.part("user", user);
 
             return webClient.post()
@@ -122,20 +125,10 @@ public class DifyFileUploadService {
     }
 
     /**
-     * 上传单个文件到Dify（使用默认用户标识）
-     *
-     * @param file 要上传的文件
-     * @return 上传响应
-     */
-    public Mono<DifyFileUploadResponse> uploadFile(MultipartFile file) {
-        return uploadFile(file, "default-user");
-    }
-
-    /**
      * 根据文件路径上传文件到Dify
      *
      * @param filePath 本地文件路径
-     * @param user 用户标识
+     * @param user     用户标识
      * @return 上传响应
      */
     public Mono<DifyFileUploadResponse> uploadFileByPath(String filePath, String user) {
@@ -150,16 +143,15 @@ public class DifyFileUploadService {
 
         String filename = file.getName();
         String contentType = getContentType(filename);
-        long fileSize = file.length();
 
         MultipartBodyBuilder bodyBuilder = new MultipartBodyBuilder();
-        
+
         org.springframework.core.io.Resource resource = new org.springframework.core.io.FileSystemResource(file);
-        
+
         bodyBuilder.part("file", resource)
                 .filename(filename)
                 .contentType(MediaType.parseMediaType(contentType));
-        
+
         bodyBuilder.part("user", user);
 
         return webClient.post()
@@ -184,23 +176,13 @@ public class DifyFileUploadService {
     }
 
     /**
-     * 根据文件路径上传文件到Dify（使用默认用户标识）
-     *
-     * @param filePath 本地文件路径
-     * @return 上传响应
-     */
-    public Mono<DifyFileUploadResponse> uploadFileByPath(String filePath) {
-        return uploadFileByPath(filePath, "default-user");
-    }
-
-    /**
      * 根据文件名获取ContentType
      */
     private String getContentType(String filename) {
         if (filename == null) {
             return "application/octet-stream";
         }
-        
+
         String extension = filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
         return switch (extension) {
             case "png" -> "image/png";
