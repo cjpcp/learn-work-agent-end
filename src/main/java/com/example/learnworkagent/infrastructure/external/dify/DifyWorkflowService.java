@@ -4,7 +4,6 @@ import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -32,9 +31,6 @@ public class DifyWorkflowService {
     @Value("${dify.api-key:app-n6sVBytOtdXBvScrUbBXjq1B}")
     private String apiKey;
 
-    @Value("${dify.timeout:30000}")
-    private int timeout;
-
     public DifyWorkflowService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder
                 .build();
@@ -44,7 +40,7 @@ public class DifyWorkflowService {
      * 调用Dify工作流识别文档
      *
      * @param fileUrls 文件URL列表
-     * @param user 用户标识
+     * @param user     用户标识
      * @return 识别结果
      */
     public Mono<Map<String, Object>> identifyDocuments(List<String> fileUrls, String user) {
@@ -68,7 +64,8 @@ public class DifyWorkflowService {
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(requestBody)
                 .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
+                })
                 .doOnSuccess(response -> log.info("Dify工作流调用成功: {}", response))
                 .doOnError(error -> {
                     if (error instanceof WebClientResponseException wcre) {
@@ -124,16 +121,16 @@ public class DifyWorkflowService {
 
         // 提取URL中的文件扩展名
         String lowerUrl = url.toLowerCase();
-        
+
         // 图片文件扩展名
         String[] imageExtensions = {"jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "svg"};
-        
+
         for (String ext : imageExtensions) {
             if (lowerUrl.endsWith("." + ext)) {
                 return "image";
             }
         }
-        
+
         // 其他文件默认为document
         return "document";
     }
