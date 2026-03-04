@@ -7,6 +7,7 @@ import com.example.learnworkagent.domain.notification.service.NotificationServic
 import com.example.learnworkagent.infrastructure.external.ai.OcrService;
 import com.example.learnworkagent.infrastructure.external.dify.DifyFileUploadResponse;
 import com.example.learnworkagent.infrastructure.external.dify.DifyFileUploadService;
+import com.example.learnworkagent.infrastructure.external.dify.DifyWorkflowService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,7 @@ public class TestController {
     private final LeaveApplicationService leaveApplicationService;
     private final NotificationService notificationService;
     private final DifyFileUploadService difyFileUploadService;
+    private final DifyWorkflowService difyWorkflowService;
 
     /**
      * 测试 OCR 服务 - 识别文档类型
@@ -381,6 +383,38 @@ public class TestController {
                 .onErrorResume(error -> {
                     log.error("Dify文件上传失败", error);
                     return Mono.just(Result.fail("文件上传失败: " + error.getMessage()));
+                });
+    }
+
+    /**
+     * 测试Dify工作流识别文档
+     *
+     * @param fileUrls 文件URL列表（逗号分隔）
+     * @param user     用户标识
+     * @return 识别结果
+     */
+    @Operation(summary = "测试Dify工作流识别文档", description = "使用Dify工作流识别多个文件和图片")
+    @GetMapping("/dify/workflow/identify")
+    public Mono<Result<java.util.Map<String, Object>>> testDifyWorkflowIdentify(
+            @RequestParam String fileUrls,
+            @RequestParam(value = "user", defaultValue = "test-user") String user) {
+
+        log.info("测试Dify工作流识别文档，文件URLs: {}, 用户: {}", fileUrls, user);
+
+        java.util.List<String> urlList = java.util.Arrays.asList(fileUrls.split(","))
+                .stream()
+                .map(String::trim)
+                .filter(url -> !url.isEmpty())
+                .toList();
+
+        return difyWorkflowService.identifyDocuments(urlList, user)
+                .map(result -> {
+                    log.info("Dify工作流识别成功: {}", result);
+                    return Result.success("文档识别成功", result);
+                })
+                .onErrorResume(error -> {
+                    log.error("Dify工作流识别失败", error);
+                    return Mono.just(Result.fail("文档识别失败: " + error.getMessage()));
                 });
     }
 }

@@ -10,7 +10,7 @@ import com.example.learnworkagent.domain.notification.entity.NotificationMessage
 import com.example.learnworkagent.domain.notification.service.NotificationService;
 import com.example.learnworkagent.domain.user.entity.User;
 import com.example.learnworkagent.domain.user.repository.UserRepository;
-import com.example.learnworkagent.infrastructure.external.ai.OcrService;
+import com.example.learnworkagent.infrastructure.external.dify.DifyWorkflowService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 奖助申请服务
@@ -34,7 +35,7 @@ import java.util.List;
 public class AwardApplicationService {
 
     private final AwardApplicationRepository awardApplicationRepository;
-    private final OcrService ocrService;
+    private final DifyWorkflowService difyWorkflowService;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
 
@@ -108,99 +109,92 @@ public class AwardApplicationService {
             return false;
         }
 
-        // 根据申请类型检查必需材料
-        String applicationType = application.getApplicationType();
-        if ("SCHOLARSHIP".equals(applicationType)) {
-            // 奖学金需要成绩单、推荐信等
-            return checkScholarshipMaterials(application.getAttachmentUrls());
-        } else if ("GRANT".equals(applicationType) || "SUBSIDY".equals(applicationType)) {
-            return checkGrantMaterials(application.getAttachmentUrls());
+        // 将附件URL转换为列表
+        List<String> fileUrls = Arrays.stream(application.getAttachmentUrls().split(","))
+                .map(String::trim)
+                .filter(url -> !url.isEmpty())
+                .toList();
+
+        if (fileUrls.isEmpty()) {
+            return false;
         }
 
-        return true;
+        // 使用Dify工作流识别所有文件
+        try {
+            Map<String, Object> result = difyWorkflowService.identifyDocuments(fileUrls)
+                    .block(Duration.ofSeconds(30));
+
+            log.info("Dify工作流识别结果: {}", result);
+
+            // 根据申请类型检查必需材料
+            String applicationType = application.getApplicationType();
+            if ("SCHOLARSHIP".equals(applicationType)) {
+                // 奖学金需要成绩单、推荐信等
+                return checkScholarshipMaterials(result);
+            } else if ("GRANT".equals(applicationType) || "SUBSIDY".equals(applicationType)) {
+                return checkGrantMaterials(result);
+            }
+
+            return true;
+        } catch (Exception e) {
+            log.error("Dify工作流识别失败", e);
+            return false;
+        }
     }
 
     /**
      * 检查奖学金材料是否提供
      *
-     * @param attachmentUrls 奖学金url
+     * @param result Dify工作流识别结果
      * @return 是否提供
      */
-    private boolean checkScholarshipMaterials(String attachmentUrls) {
-        String[] urls = attachmentUrls.split(",");
+    private boolean checkScholarshipMaterials(Map<String, Object> result) {
+        // 解析Dify工作流的识别结果
+        // 这里需要根据实际的Dify工作流输出格式进行调整
         boolean hasTranscript = false;
         boolean hasRecommendation = false;
 
-        for (String url : urls) {
-            String trimmedUrl = url.trim();
-            if (trimmedUrl.isEmpty()) {
-                continue;
-            }
-
-            try {
-                // 每个 URL 只调用一次 OCR，根据识别结果判断是否满足条件
-                String documentType = ocrService.identifyDocumentType(trimmedUrl)
-                        .block(Duration.ofSeconds(15)); // 减少阻塞时间
-
-                if ("成绩单".equals(documentType)) {
-                    hasTranscript = true;
-                    log.info("检测到成绩单: {}", trimmedUrl);
-                } else if ("推荐信".equals(documentType)) {
-                    hasRecommendation = true;
-                    log.info("检测到推荐信: {}", trimmedUrl);
-                }
-
-                // 如果两种材料都找到了，提前结束循环
-                if (hasTranscript && hasRecommendation) {
-                    break;
-                }
-            } catch (Exception e) {
-                log.error("OCR 识别失败: {}", trimmedUrl, e);
+        // 示例：假设Dify工作流返回的结果中包含识别出的文档类型
+        if (result != null) {
+            // 具体的解析逻辑需要根据Dify工作流的实际输出格式调整
+            // 这里是一个示例实现
+            Object output = result.get("output");
+            if (output != null) {
+                String outputStr = output.toString().toLowerCase();
+                hasTranscript = outputStr.contains("成绩单");
+                hasRecommendation = outputStr.contains("推荐信");
             }
         }
 
+        log.info("奖学金材料检查结果 - 成绩单: {}, 推荐信: {}", hasTranscript, hasRecommendation);
         return hasTranscript && hasRecommendation;
     }
 
     /**
      * 检查助学金材料是否提供
      *
-     * @param attachmentUrls 助学金材料url
+     * @param result Dify工作流识别结果
      * @return 是否提供
      */
-    private boolean checkGrantMaterials(String attachmentUrls) {
-        String[] urls = attachmentUrls.split(",");
+    private boolean checkGrantMaterials(Map<String, Object> result) {
+        // 解析Dify工作流的识别结果
+        // 这里需要根据实际的Dify工作流输出格式进行调整
         boolean hasFamilyProof = false;
         boolean hasIncomeProof = false;
 
-        for (String url : urls) {
-            String trimmedUrl = url.trim();
-            if (trimmedUrl.isEmpty()) {
-                continue;
-            }
-
-            try {
-                // 每个 URL 只调用一次 OCR，根据识别结果判断是否满足条件
-                String documentType = ocrService.identifyDocumentType(trimmedUrl)
-                        .block(Duration.ofSeconds(15)); // 减少阻塞时间
-
-                if ("家庭情况证明".equals(documentType)) {
-                    hasFamilyProof = true;
-                    log.info("检测到家庭情况证明: {}", trimmedUrl);
-                } else if ("收入证明".equals(documentType)) {
-                    hasIncomeProof = true;
-                    log.info("检测到收入证明: {}", trimmedUrl);
-                }
-
-                // 如果两种材料都找到了，提前结束循环
-                if (hasFamilyProof && hasIncomeProof) {
-                    break;
-                }
-            } catch (Exception e) {
-                log.error("OCR 识别失败: {}", trimmedUrl, e);
+        // 示例：假设Dify工作流返回的结果中包含识别出的文档类型
+        if (result != null) {
+            // 具体的解析逻辑需要根据Dify工作流的实际输出格式调整
+            // 这里是一个示例实现
+            Object output = result.get("output");
+            if (output != null) {
+                String outputStr = output.toString().toLowerCase();
+                hasFamilyProof = outputStr.contains("家庭情况证明");
+                hasIncomeProof = outputStr.contains("收入证明");
             }
         }
 
+        log.info("助学金材料检查结果 - 家庭情况证明: {}, 收入证明: {}", hasFamilyProof, hasIncomeProof);
         return hasFamilyProof && hasIncomeProof;
     }
 
