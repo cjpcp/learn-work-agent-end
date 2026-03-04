@@ -5,15 +5,21 @@ import com.example.learnworkagent.domain.leave.service.LeaveApplicationService;
 import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
 import com.example.learnworkagent.domain.notification.service.NotificationService;
 import com.example.learnworkagent.infrastructure.external.ai.OcrService;
+import com.example.learnworkagent.infrastructure.external.dify.DifyFileUploadResponse;
+import com.example.learnworkagent.infrastructure.external.dify.DifyFileUploadService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -33,6 +39,7 @@ public class TestController {
     private final OcrService ocrService;
     private final LeaveApplicationService leaveApplicationService;
     private final NotificationService notificationService;
+    private final DifyFileUploadService difyFileUploadService;
 
     /**
      * 测试 OCR 服务 - 识别文档类型
@@ -322,5 +329,58 @@ public class TestController {
             log.error("通知发送失败", e);
             return Result.fail("通知发送失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 测试Dify文件上传
+     *
+     * @param file 上传的文件
+     * @param user 用户标识
+     * @return 上传结果
+     */
+    @Operation(summary = "测试Dify文件上传", description = "上传单个文件到Dify平台")
+    @PostMapping(value = "/dify/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Mono<Result<DifyFileUploadResponse>> testDifyUpload(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(value = "user", defaultValue = "test-user") String user) {
+
+        log.info("测试Dify文件上传，文件名: {}, 大小: {}, 用户: {}",
+                file.getOriginalFilename(), file.getSize(), user);
+
+        return difyFileUploadService.uploadFile(file, user)
+                .map(response -> {
+                    log.info("Dify文件上传成功，文件ID: {}", response.getId());
+                    return Result.success("文件上传成功", response);
+                })
+                .onErrorResume(error -> {
+                    log.error("Dify文件上传失败", error);
+                    return Mono.just(Result.fail("文件上传失败: " + error.getMessage()));
+                });
+    }
+
+    /**
+     * 测试Dify文件上传（通过本地文件路径）
+     *
+     * @param filePath 本地文件路径
+     * @param user     用户标识
+     * @return 上传结果
+     */
+    @Operation(summary = "测试Dify文件上传（本地路径）", description = "通过本地文件路径上传到Dify平台")
+    @GetMapping("/dify/upload-by-path")
+    public Mono<Result<DifyFileUploadResponse>> testDifyUploadByPath(
+            @RequestParam String filePath,
+            @RequestParam(value = "user", defaultValue = "test-user") String user) {
+
+        log.info("测试Dify文件上传（本地路径），路径: {}, 用户: {}", filePath, user);
+
+        return difyFileUploadService.uploadFileByPath(filePath, user)
+                .map(response -> {
+                    log.info("Dify文件上传成功，文件ID: {}", response.getId());
+                    return Result.success("文件上传成功", response);
+                })
+                .onErrorResume(error -> {
+                    log.error("Dify文件上传失败", error);
+                    return Mono.just(Result.fail("文件上传失败: " + error.getMessage()));
+                });
     }
 }
