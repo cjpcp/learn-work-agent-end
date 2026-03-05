@@ -4,10 +4,12 @@ import com.example.learnworkagent.common.Result;
 import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.domain.consultation.dto.ConsultationRequest;
+import com.example.learnworkagent.domain.consultation.dto.DifyConsultationRequest;
 import com.example.learnworkagent.domain.consultation.dto.TransferToHumanRequest;
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
 import com.example.learnworkagent.domain.consultation.service.ConsultationService;
 import com.example.learnworkagent.domain.consultation.service.HumanTransferService;
+import com.example.learnworkagent.infrastructure.external.dify.DifyChatService;
 import com.example.learnworkagent.infrastructure.external.oss.OssService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +24,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * 咨询控制器
@@ -36,6 +39,7 @@ public class ConsultationController extends BaseController {
     private final ConsultationService consultationService;
     private final HumanTransferService humanTransferService;
     private final OssService ossService;
+    private final DifyChatService difyChatService;
 
     @Operation(summary = "提交咨询问题")
     @PostMapping("/questions")
@@ -225,6 +229,72 @@ public class ConsultationController extends BaseController {
         Long userId = getCurrentUserId();
         String voiceUrl = ossService.uploadConsultationFile(file, userId, "voice");
         return Result.success(voiceUrl);
+    }
+
+    /**
+     * Dify智能咨询（流式响应）
+     *
+     * @param request Dify咨询请求封装：问题内容，文件列表，对话ID
+     * @return 流式响应
+     */
+    @Operation(summary = "Dify智能咨询（流式响应）")
+    @PostMapping(value = "/dify/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter difyChat(@Valid @RequestBody DifyConsultationRequest request) {
+        final Long userId = getCurrentUserId();
+        final String user = userId != null ? String.valueOf(userId) : "anonymous";
+
+        log.info("收到Dify智能咨询请求，user: {}, query: {}, conversationId: {}, 文件数: {}", 
+                user, request.getQuery(), request.getConversationId(), 
+                request.getFiles() != null ? request.getFiles().size() : 0);
+
+        SseEmitter emitter = new SseEmitter(120000L);
+
+        emitter.onCompletion(() -> log.info("Dify SSE连接完成，user: {}", user));
+        emitter.onError((error) -> log.error("Dify SSE连接错误，user: {}", user, error));
+        emitter.onTimeout(() -> {
+            log.warn("Dify SSE连接超时，user: {}", user);
+            try {
+                emitter.send(SseEmitter.event().data("错误: 请求超时"));
+            } catch (IOException e) {
+                log.error("发送超时错误失败", e);
+            }
+            emitter.complete();
+        });
+
+        List<String> fileUrls = difyChatService.extractFileUrls(request.getFiles());
+
+        Flux<String> responseFlux = difyChatService.chatStream(
+                request.getQuery(),
+                fileUrls,
+                request.getConversationId(),
+                user
+        );
+
+        responseFlux.publishOn(Schedulers.boundedElastic()).subscribe(
+                chunk -> {
+                    log.debug("接收到Dify chunk，user: {}, chunk: {}", user, chunk);
+                    try {
+                        emitter.send(SseEmitter.event().data(chunk));
+                    } catch (IOException e) {
+                        log.error("发送Dify SSE数据失败，user: {}", user, e);
+                    }
+                },
+                error -> {
+                    log.error("Dify SSE流处理错误，user: {}", user, error);
+                    try {
+                        emitter.send(SseEmitter.event().data("错误: " + error.getMessage()));
+                    } catch (IOException e) {
+                        log.error("发送错误消息失败", e);
+                    }
+                    emitter.completeWithError(error);
+                },
+                () -> {
+                    log.info("Dify SSE流处理完成，user: {}", user);
+                    emitter.complete();
+                }
+        );
+
+        return emitter;
     }
 
     //todo 转人工后的人工操作

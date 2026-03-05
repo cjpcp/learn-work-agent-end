@@ -4,6 +4,7 @@ import com.example.learnworkagent.common.Result;
 import com.example.learnworkagent.domain.leave.service.LeaveApplicationService;
 import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
 import com.example.learnworkagent.domain.notification.service.NotificationService;
+import com.example.learnworkagent.infrastructure.external.dify.DifyChatService;
 import com.example.learnworkagent.infrastructure.external.dify.DifyFileUploadResponse;
 import com.example.learnworkagent.infrastructure.external.dify.DifyFileUploadService;
 import com.example.learnworkagent.infrastructure.external.dify.DifyWorkflowService;
@@ -15,13 +16,18 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
@@ -41,6 +47,7 @@ public class TestController {
     private final NotificationService notificationService;
     private final DifyFileUploadService difyFileUploadService;
     private final DifyWorkflowService difyWorkflowService;
+    private final DifyChatService difyChatService;
 
 
 
@@ -370,5 +377,76 @@ public class TestController {
                     log.error("Dify工作流识别失败", error);
                     return Mono.just(Result.fail("文档识别失败: " + error.getMessage()));
                 });
+    }
+
+    /**
+     * 测试Dify聊天接口（流式响应）
+     *
+     * @param query          用户问题
+     * @param fileUrls       文件URL列表（可选，逗号分隔）
+     * @param conversationId 对话ID（可选）
+     * @param user           用户标识
+     * @return 流式响应
+     */
+    @Operation(summary = "测试Dify聊天接口", description = "使用Dify聊天API进行智能咨询（流式响应）")
+    @PostMapping(value = "/dify/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter testDifyChat(
+            @RequestParam String query,
+            @RequestParam(required = false) String fileUrls,
+            @RequestParam(required = false, defaultValue = "") String conversationId,
+            @RequestParam(value = "user", defaultValue = "test-user") String user) {
+
+        log.info("测试Dify聊天接口，query: {}, fileUrls: {}, conversationId: {}, user: {}",
+                query, fileUrls, conversationId, user);
+
+        java.util.List<String> urlList = null;
+        if (fileUrls != null && !fileUrls.isEmpty()) {
+            urlList = Arrays.stream(fileUrls.split(","))
+                    .map(String::trim)
+                    .filter(url -> !url.isEmpty())
+                    .toList();
+        }
+
+        SseEmitter emitter = new SseEmitter(120000L);
+
+        emitter.onCompletion(() -> log.info("Dify聊天SSE连接完成，user: {}", user));
+        emitter.onError((error) -> log.error("Dify聊天SSE连接错误，user: {}", user, error));
+        emitter.onTimeout(() -> {
+            log.warn("Dify聊天SSE连接超时，user: {}", user);
+            try {
+                emitter.send(SseEmitter.event().data("错误: 请求超时"));
+            } catch (IOException e) {
+                log.error("发送超时错误失败", e);
+            }
+            emitter.complete();
+        });
+
+        Flux<String> responseFlux = difyChatService.chatStream(query, urlList, conversationId, user);
+
+        responseFlux.publishOn(Schedulers.boundedElastic()).subscribe(
+                chunk -> {
+                    log.debug("接收到Dify聊天chunk，user: {}, chunk: {}", user, chunk);
+                    try {
+                        emitter.send(SseEmitter.event().data(chunk));
+                    } catch (IOException e) {
+                        log.error("发送Dify聊天SSE数据失败，user: {}", user, e);
+                    }
+                },
+                error -> {
+                    log.error("Dify聊天SSE流处理错误，user: {}", user, error);
+                    try {
+                        emitter.send(SseEmitter.event().data("错误: " + error.getMessage()));
+                    } catch (IOException e) {
+                        log.error("发送错误消息失败", e);
+                    }
+                    emitter.completeWithError(error);
+                },
+                () -> {
+                    log.info("Dify聊天SSE流处理完成，user: {}", user);
+                    emitter.complete();
+                }
+        );
+
+        return emitter;
     }
 }
