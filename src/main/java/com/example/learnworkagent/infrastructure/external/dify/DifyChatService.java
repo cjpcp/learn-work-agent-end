@@ -28,10 +28,10 @@ public class DifyChatService {
     private final WebClient webClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${dify.base-url:http://localhost}")
+    @Value("${dify.chat.base-url:http://localhost}")
     private String baseUrl;
 
-    @Value("${dify.chat-api-key:app-WVk7LOKCEjRHeoaiPf536xKh}")
+    @Value("${dify.chat.api-key:app-WVk7LOKCEjRHeoaiPf536xKh}")
     private String chatApiKey;
 
     public DifyChatService(WebClient.Builder webClientBuilder) {

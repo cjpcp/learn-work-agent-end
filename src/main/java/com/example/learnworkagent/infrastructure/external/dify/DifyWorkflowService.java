@@ -25,10 +25,10 @@ public class DifyWorkflowService {
 
     private final WebClient webClient;
 
-    @Value("${dify.base-url:http://localhost}")
+    @Value("${dify.workflow.base-url:http://localhost}")
     private String baseUrl;
 
-    @Value("${dify.api-key:app-n6sVBytOtdXBvScrUbBXjq1B}")
+    @Value("${dify.workflow.api-key:app-n6sVBytOtdXBvScrUbBXjq1B}")
     private String apiKey;
 
     public DifyWorkflowService(WebClient.Builder webClientBuilder) {
