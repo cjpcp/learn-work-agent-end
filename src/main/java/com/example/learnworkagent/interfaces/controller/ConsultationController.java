@@ -11,6 +11,7 @@ import com.example.learnworkagent.domain.consultation.service.ConsultationServic
 import com.example.learnworkagent.domain.consultation.service.HumanTransferService;
 import com.example.learnworkagent.infrastructure.external.dify.DifyChatService;
 import com.example.learnworkagent.infrastructure.external.oss.OssService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,7 +25,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 咨询控制器
@@ -40,6 +43,7 @@ public class ConsultationController extends BaseController {
     private final HumanTransferService humanTransferService;
     private final OssService ossService;
     private final DifyChatService difyChatService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Operation(summary = "提交咨询问题")
     @PostMapping("/questions")
@@ -190,8 +194,13 @@ public class ConsultationController extends BaseController {
                 chunk -> {
                     log.info("接收到chunk，userId: {}, chunk: {}", userId, chunk);
                     try {
+                        // 将纯文本包装为JSON格式，包含answer字段
+                        Map<String, String> data = new HashMap<>();
+                        data.put("answer", chunk);
+                        String jsonData = objectMapper.writeValueAsString(data);
+                        
                         log.debug("发送SSE数据，userId: {}, chunk长度: {}, chunk内容: {}", userId, chunk.length(), chunk);
-                        emitter.send(SseEmitter.event().data(chunk));
+                        emitter.send(SseEmitter.event().data(jsonData));
                         log.info("成功发送SSE数据，userId: {}, chunk: {}", userId, chunk);
                     } catch (IOException e) {
                         log.error("发送SSE数据失败，userId: {}", userId, e);

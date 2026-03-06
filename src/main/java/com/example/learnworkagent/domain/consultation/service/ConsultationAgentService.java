@@ -4,7 +4,7 @@ import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
 import com.example.learnworkagent.domain.consultation.repository.ConsultationQuestionRepository;
-import com.example.learnworkagent.infrastructure.external.ai.QianwenApiClient;
+import com.example.learnworkagent.infrastructure.external.dify.DifyChatService;
 import com.example.learnworkagent.infrastructure.service.CacheService;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
 public class ConsultationAgentService {
 
     private final ConsultationQuestionRepository consultationQuestionRepository;
-    private final QianwenApiClient qianwenApiClient;
+    private final DifyChatService difyChatService;
     private final CacheService cacheService;
 
     // 注入自身的代理对象，用于解决事务自调用问题
@@ -67,9 +67,11 @@ public class ConsultationAgentService {
             String prompt = buildPrompt(question);
             if ("IMAGE".equals(question.getQuestionType()) && question.getImageUrl() != null) {
                 // 处理图片类型问题
-                qianwenApiClient.generateMultimodal(prompt, question.getImageUrl())
+                difyChatService.chatStream(prompt, java.util.List.of(question.getImageUrl()), null, String.valueOf(question.getUserId()))
+                        .collectList()
                         .subscribe(
-                                answer -> {
+                                answerList -> {
+                                    String answer = String.join("", answerList);
                                     // 缓存答案
                                     cacheAnswer(question, answer);
                                     // 更新问题答案
@@ -83,9 +85,11 @@ public class ConsultationAgentService {
                         );
             } else {
                 // 处理文本或语音类型问题
-                qianwenApiClient.generateText(prompt)
+                difyChatService.chatStream(prompt, null, null, String.valueOf(question.getUserId()))
+                        .collectList()
                         .subscribe(
-                                answer -> {
+                                answerList -> {
+                                    String answer = String.join("", answerList);
                                     // 缓存答案
                                     cacheAnswer(question, answer);
                                     // 更新问题答案
@@ -218,14 +222,14 @@ public class ConsultationAgentService {
 
                     //咨询ai返回结果
                     String prompt = buildPrompt(question);
-                    log.info("调用千问AI，问题ID: {}, prompt: {}", questionId, prompt);
+                    log.info("调用Dify AI，问题ID: {}, prompt: {}", questionId, prompt);
                     
                     if ("IMAGE".equals(question.getQuestionType()) && question.getImageUrl() != null) {
                         // 处理图片类型问题
-                        return qianwenApiClient.generateMultimodalStream(prompt, question.getImageUrl())
+                        return difyChatService.chatStream(prompt, java.util.List.of(question.getImageUrl()), null, String.valueOf(question.getUserId()))
                                 //所有数据发送完成时的回调函数
                                 .doOnComplete(() -> {
-                                    log.info("千问多模态API调用完成，问题ID: {}", questionId);
+                                    log.info("Dify多模态API调用完成，问题ID: {}", questionId);
                                     //使用专门的线程池来处理阻塞任务
                                     Mono.fromRunnable(() -> {
                                                 question.setStatus("ANSWERED");
@@ -248,10 +252,10 @@ public class ConsultationAgentService {
                                 });
                     } else {
                         // 处理文本或语音类型问题
-                        return qianwenApiClient.generateTextStream(prompt)
+                        return difyChatService.chatStream(prompt, null, null, String.valueOf(question.getUserId()))
                                 //所有数据发送完成时的回调函数
                                 .doOnComplete(() -> {
-                                    log.info("千问API调用完成，问题ID: {}", questionId);
+                                    log.info("Dify API调用完成，问题ID: {}", questionId);
                                     //使用专门的线程池来处理阻塞任务
                                     Mono.fromRunnable(() -> {
                                                 question.setStatus("ANSWERED");

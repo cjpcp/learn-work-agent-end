@@ -73,23 +73,39 @@ public class DifyChatService {
                 .bodyToFlux(String.class)
                 .map(chunk -> {
                     try {
-                        JsonNode jsonNode = objectMapper.readTree(chunk);
-                        JsonNode dataNode = jsonNode.get("data");
-                        if (dataNode != null && dataNode.isObject()) {
-                            JsonNode outputsNode = dataNode.get("outputs");
-                            if (outputsNode != null && outputsNode.isObject()) {
-                                JsonNode answerNode = outputsNode.get("answer");
-                                if (answerNode != null && answerNode.isTextual()) {
-                                    return answerNode.asText();
+                        // 处理SSE格式数据，保留内容中的换行符
+                        String jsonStr = chunk;
+                        if (chunk.startsWith("data:")) {
+                            // 只移除"data:"前缀，不trim以保留内容中的换行和空格
+                            jsonStr = chunk.substring(5);
+                        }
+                        
+                        // 跳过[DONE]标记
+                        if ("[DONE]".equals(jsonStr)) {
+                            return "";
+                        }
+                        
+                        JsonNode jsonNode = objectMapper.readTree(jsonStr);
+                        
+                        // Dify流式响应中，delta.text包含增量内容
+                        JsonNode eventNode = jsonNode.get("event");
+                        if (eventNode != null && "message".equals(eventNode.asText())) {
+                            JsonNode answerNode = jsonNode.get("answer");
+                            if (answerNode != null && answerNode.isTextual()) {
+                                String answer = answerNode.asText();
+                                // 只返回非空的新增内容
+                                if (!answer.isEmpty()) {
+                                    return answer;
                                 }
                             }
                         }
                     } catch (Exception e) {
-                        log.error("解析Dify返回数据失败", e);
+                        log.error("解析Dify返回数据失败，chunk: {}", chunk, e);
                     }
                     return "";
                 })
                 .filter(chunk -> !chunk.isEmpty())
+                .distinct() // 去重，防止重复内容
                 .doOnNext(chunk -> log.debug("接收到流式数据chunk: {}", chunk))
                 .doOnComplete(() -> log.info("Dify聊天API调用完成，user: {}", user))
                 .doOnError(error -> {
