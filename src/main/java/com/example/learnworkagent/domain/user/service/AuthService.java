@@ -58,6 +58,11 @@ public class AuthService {
         response.setUsername(user.getUsername());
         response.setRealName(user.getRealName());
         response.setRole(user.getRole());
+        response.setDepartment(user.getDepartment());
+        response.setGrade(user.getGrade());
+        response.setClassName(user.getClassName());
+        response.setWorkDepartment(user.getWorkDepartment());
+        response.setPosition(user.getPosition());
 
         return response;
     }
@@ -67,7 +72,9 @@ public class AuthService {
      */
     @Transactional
     public User register(String username, String password, String realName,
-                         String studentNo, String phone, String email, String role) {
+                         String studentNo, String phone, String email, String role,
+                         String department, String grade, String className,
+                         String workDepartment, String position) {
 
         //根据用户名进行查询，如果已存在则进行报错
         if (userRepository.findByUsernameAndDeletedFalse(username).isPresent()) {
@@ -84,6 +91,11 @@ public class AuthService {
         user.setEmail(email);
         user.setRole(role != null ? role : "STUDENT");
         user.setStatus("ACTIVE");
+        user.setDepartment(department);
+        user.setGrade(grade);
+        user.setClassName(className);
+        user.setWorkDepartment(workDepartment);
+        user.setPosition(position);
 
         return userRepository.save(user);
     }

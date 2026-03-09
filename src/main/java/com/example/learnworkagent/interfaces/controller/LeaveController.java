@@ -38,14 +38,7 @@ public class LeaveController extends BaseController {
     @PostMapping("/applications")
     public Result<LeaveApplication> submitApplication(@Valid @RequestBody LeaveApplicationRequest request) {
         Long userId = getCurrentUserId();
-        LeaveApplication application = leaveApplicationService.submitLeaveApplication(
-                userId,
-                request.getLeaveType(),
-                request.getStartDate(),
-                request.getEndDate(),
-                request.getReason(),
-                request.getAttachmentUrl()
-        );
+        LeaveApplication application = leaveApplicationService.submitLeaveApplication(userId, request);
         return Result.success(application);
     }
 

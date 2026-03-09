@@ -61,4 +61,34 @@ public class User extends BaseEntity {
      */
     @Column(name = "status", nullable = false, length = 20)
     private String status = "ACTIVE";
+
+    /**
+     * 院系（学生角色使用）
+     */
+    @Column(name = "department", length = 100)
+    private String department;
+
+    /**
+     * 年级（学生角色使用）
+     */
+    @Column(name = "grade", length = 20)
+    private String grade;
+
+    /**
+     * 班级（学生角色使用）
+     */
+    @Column(name = "class_name", length = 50)
+    private String className;
+
+    /**
+     * 所属部门（辅导员/学工角色使用）
+     */
+    @Column(name = "work_department", length = 100)
+    private String workDepartment;
+
+    /**
+     * 职位（辅导员/学工角色使用）
+     */
+    @Column(name = "position", length = 50)
+    private String position;
 }

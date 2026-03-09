@@ -94,4 +94,28 @@ public class AwardApplication extends BaseEntity {
      */
     @Column(name = "attachment_urls", columnDefinition = "TEXT")
     private String attachmentUrls;
+
+    /**
+     * 姓名
+     */
+    @Column(name = "student_name", length = 50)
+    private String studentName;
+
+    /**
+     * 院系
+     */
+    @Column(name = "department", length = 100)
+    private String department;
+
+    /**
+     * 年级
+     */
+    @Column(name = "grade", length = 20)
+    private String grade;
+
+    /**
+     * 班级
+     */
+    @Column(name = "class_name", length = 50)
+    private String className;
 }

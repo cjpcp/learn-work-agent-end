@@ -4,6 +4,7 @@ import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
+import com.example.learnworkagent.domain.award.dto.AwardApplicationRequest;
 import com.example.learnworkagent.domain.award.entity.AwardApplication;
 import com.example.learnworkagent.domain.award.repository.AwardApplicationRepository;
 import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
@@ -43,22 +44,24 @@ public class AwardApplicationService {
      * 提交奖助申请
      */
     @Transactional
-    public AwardApplication submitAwardApplication(Long applicantId, String applicationType,
-                                                   String awardName, java.math.BigDecimal amount,
-                                                   String reason, List<String> attachmentUrls) {
+    public AwardApplication submitAwardApplication(Long applicantId, AwardApplicationRequest request) {
         log.info("提交申请，用户ID: {}, 申请类型: {}, 奖项名称: {}, 金额: {}, 理由: {}",
-                applicantId, applicationType, awardName, amount, reason);
+                applicantId, request.getApplicationType(), request.getAwardName(), request.getAmount(), request.getReason());
 
         // 创建申请并保存
         AwardApplication application = new AwardApplication();
         application.setApplicantId(applicantId);
-        application.setApplicationType(applicationType);
-        application.setAwardName(awardName);
-        application.setAmount(amount);
-        application.setReason(reason);
-        application.setAttachmentUrls(attachmentUrls != null ? String.join(",", attachmentUrls) : null);
+        application.setApplicationType(request.getApplicationType());
+        application.setAwardName(request.getAwardName());
+        application.setAmount(request.getAmount());
+        application.setReason(request.getReason());
+        application.setAttachmentUrls(request.getAttachmentUrls() != null ? String.join(",", request.getAttachmentUrls()) : null);
         application.setMaterialStatus("PENDING");
         application.setApprovalStatus("PENDING");
+        application.setStudentName(request.getStudentName());
+        application.setDepartment(request.getDepartment());
+        application.setGrade(request.getGrade());
+        application.setClassName(request.getClassName());
 
         AwardApplication saved = awardApplicationRepository.save(application);
 

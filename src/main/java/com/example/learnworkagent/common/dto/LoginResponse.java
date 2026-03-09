@@ -36,4 +36,29 @@ public class LoginResponse {
      * 角色
      */
     private String role;
+
+    /**
+     * 院系（学生角色使用）
+     */
+    private String department;
+
+    /**
+     * 年级（学生角色使用）
+     */
+    private String grade;
+
+    /**
+     * 班级（学生角色使用）
+     */
+    private String className;
+
+    /**
+     * 所属部门（辅导员/学工角色使用）
+     */
+    private String workDepartment;
+
+    /**
+     * 职位（辅导员/学工角色使用）
+     */
+    private String position;
 }

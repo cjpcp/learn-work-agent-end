@@ -42,14 +42,7 @@ public class AwardController extends BaseController {
     @PostMapping("/applications")
     public Result<AwardApplication> submitApplication(@Valid @RequestBody AwardApplicationRequest request) {
         Long userId = getCurrentUserId();
-        AwardApplication application = awardApplicationService.submitAwardApplication(
-                userId,
-                request.getApplicationType(),
-                request.getAwardName(),
-                request.getAmount(),
-                request.getReason(),
-                request.getAttachmentUrls()
-        );
+        AwardApplication application = awardApplicationService.submitAwardApplication(userId, request);
         return Result.success(application);
     }
 

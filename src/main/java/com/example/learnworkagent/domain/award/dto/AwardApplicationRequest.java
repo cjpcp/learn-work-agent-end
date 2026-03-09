@@ -38,4 +38,12 @@ public class AwardApplicationRequest {
      * 附件URL列表
      */
     private List<String> attachmentUrls;
+
+    private String studentName;
+
+    private String department;
+
+    private String grade;
+
+    private String className;
 }

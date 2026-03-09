@@ -24,4 +24,12 @@ public class LeaveApplicationRequest {
     private String reason;
 
     private String attachmentUrl;
+
+    private String studentName;
+
+    private String department;
+
+    private String grade;
+
+    private String className;
 }

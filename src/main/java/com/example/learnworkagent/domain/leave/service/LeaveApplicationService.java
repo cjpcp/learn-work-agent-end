@@ -4,6 +4,7 @@ import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
+import com.example.learnworkagent.domain.leave.dto.LeaveApplicationRequest;
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.repository.LeaveApplicationRepository;
 import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
@@ -49,30 +50,32 @@ public class LeaveApplicationService {
      * 提交请假申请
      */
     @Transactional
-    public LeaveApplication submitLeaveApplication(Long applicantId, String leaveType,
-                                                   LocalDate startDate, LocalDate endDate,
-                                                   String reason, String attachmentUrl) {
+    public LeaveApplication submitLeaveApplication(Long applicantId, LeaveApplicationRequest request) {
         // 验证日期
-        if (startDate.isAfter(endDate)) {
+        if (request.getStartDate().isAfter(request.getEndDate())) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "开始日期不能晚于结束日期");
         }
 
-        if (startDate.isBefore(LocalDate.now())) {
+        if (request.getStartDate().isBefore(LocalDate.now())) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "开始日期不能早于今天");
         }
 
         // 计算请假天数
-        long days = ChronoUnit.DAYS.between(startDate, endDate) + 1;
+        long days = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
 
         LeaveApplication application = new LeaveApplication();
         application.setApplicantId(applicantId);
-        application.setLeaveType(leaveType);
-        application.setStartDate(startDate);
-        application.setEndDate(endDate);
+        application.setLeaveType(request.getLeaveType());
+        application.setStartDate(request.getStartDate());
+        application.setEndDate(request.getEndDate());
         application.setDays((int) days);
-        application.setReason(reason);
-        application.setAttachmentUrl(attachmentUrl);
+        application.setReason(request.getReason());
+        application.setAttachmentUrl(request.getAttachmentUrl());
         application.setApprovalStatus("PENDING");
+        application.setStudentName(request.getStudentName());
+        application.setDepartment(request.getDepartment());
+        application.setGrade(request.getGrade());
+        application.setClassName(request.getClassName());
 
         return leaveApplicationRepository.save(application);
     }
