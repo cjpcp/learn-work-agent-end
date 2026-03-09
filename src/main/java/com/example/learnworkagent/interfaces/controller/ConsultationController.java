@@ -240,6 +240,14 @@ public class ConsultationController extends BaseController {
         return Result.success(voiceUrl);
     }
 
+    @Operation(summary = "上传咨询文件")
+    @PostMapping(value = "/upload/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<String> uploadFile(@RequestParam("file") MultipartFile file) {
+        Long userId = getCurrentUserId();
+        String fileUrl = ossService.uploadConsultationFile(file, userId, "file");
+        return Result.success(fileUrl);
+    }
+
     /**
      * Dify智能咨询（流式响应）
      *
