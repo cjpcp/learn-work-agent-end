@@ -1,12 +1,16 @@
 package com.example.learnworkagent.interfaces.controller;
 
 import com.example.learnworkagent.common.Result;
+import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
+import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.domain.consultation.dto.ConsultationRequest;
 import com.example.learnworkagent.domain.consultation.dto.DifyConsultationRequest;
 import com.example.learnworkagent.domain.consultation.dto.TransferToHumanRequest;
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
+import com.example.learnworkagent.domain.consultation.entity.HumanTransfer;
+import com.example.learnworkagent.domain.consultation.repository.HumanTransferRepository;
 import com.example.learnworkagent.domain.consultation.service.ConsultationService;
 import com.example.learnworkagent.domain.consultation.service.HumanTransferService;
 import com.example.learnworkagent.infrastructure.external.dify.DifyChatService;
@@ -41,6 +45,7 @@ public class ConsultationController extends BaseController {
 
     private final ConsultationService consultationService;
     private final HumanTransferService humanTransferService;
+    private final HumanTransferRepository humanTransferRepository;
     private final OssService ossService;
     private final DifyChatService difyChatService;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -312,6 +317,84 @@ public class ConsultationController extends BaseController {
         );
 
         return emitter;
+    }
+
+    /**
+     * 分页查询用户的转人工记录
+     *
+     * @param pageRequest 分页参数：页码，每页数量
+     * @return 分页查询结果
+     */
+    @Operation(summary = "分页查询用户的转人工记录")
+    @GetMapping("/transfers")
+    public Result<PageResult<HumanTransfer>> getUserTransfers(@Valid PageRequest pageRequest) {
+        Long userId = getCurrentUserId();
+        PageResult<HumanTransfer> result = humanTransferService.getUserTransfers(userId, pageRequest);
+        return Result.success(result);
+    }
+
+    /**
+     * 获取转人工记录详情
+     *
+     * @param id 转人工记录id
+     * @return 转人工记录详情
+     */
+    @Operation(summary = "获取转人工记录详情")
+    @GetMapping("/transfers/{id}")
+    public Result<HumanTransfer> getTransferDetail(@PathVariable Long id) {
+        Long userId = getCurrentUserId();
+        HumanTransfer transfer = humanTransferRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "转人工记录不存在"));
+        
+        // 验证权限，只能查看自己的转人工记录
+        if (!transfer.getStaffId().equals(userId)) {
+            throw new BusinessException(ResultCode.FORBIDDEN, "无权查看此转人工记录");
+        }
+        
+        return Result.success(transfer);
+    }
+
+    /**
+     * 分配工作人员
+     *
+     * @param id 转人工记录id
+     * @param staffId 工作人员id
+     * @return 分配结果
+     */
+    @Operation(summary = "分配工作人员")
+    @PostMapping("/transfers/{id}/assign")
+    public Result<Void> assignStaff(@PathVariable Long id, @RequestParam Long staffId) {
+        humanTransferService.assignStaff(id, staffId);
+        return Result.success();
+    }
+
+    /**
+     * 工作人员回复
+     *
+     * @param id 转人工记录id
+     * @param reply 回复内容
+     * @return 回复结果
+     */
+    @Operation(summary = "工作人员回复")
+    @PostMapping("/transfers/{id}/reply")
+    public Result<Void> reply(@PathVariable Long id, @RequestParam String reply) {
+        Long staffId = getCurrentUserId();
+        humanTransferService.reply(id, staffId, reply);
+        return Result.success();
+    }
+
+    /**
+     * 分页查询工作人员的转接记录
+     *
+     * @param pageRequest 分页参数：页码，每页数量
+     * @return 分页查询结果
+     */
+    @Operation(summary = "分页查询工作人员的转接记录")
+    @GetMapping("/transfers/staff")
+    public Result<PageResult<HumanTransfer>> getStaffTransfers(@Valid PageRequest pageRequest) {
+        Long staffId = getCurrentUserId();
+        PageResult<HumanTransfer> result = humanTransferService.getStaffTransfers(staffId, pageRequest);
+        return Result.success(result);
     }
 
     //todo 转人工后的人工操作

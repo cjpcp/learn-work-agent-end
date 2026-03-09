@@ -41,4 +41,14 @@ public interface AwardApplicationRepository extends JpaRepository<AwardApplicati
      * 根据审批状态和审批人ID查询
      */
     Page<AwardApplication> findByApprovalStatusAndApproverIdAndDeletedFalseOrderByCreateTimeDesc(String approvalStatus, Long approverId, Pageable pageable);
+
+    /**
+     * 根据申请人ID和审批状态查询
+     */
+    Page<AwardApplication> findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(Long applicantId, String approvalStatus, Pageable pageable);
+
+    /**
+     * 根据审批人ID和审批状态查询
+     */
+    Page<AwardApplication> findByApproverIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(Long approverId, String approvalStatus, Pageable pageable);
 }

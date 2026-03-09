@@ -43,5 +43,15 @@ public interface LeaveApplicationRepository extends JpaRepository<LeaveApplicati
     @Query("SELECT la FROM LeaveApplication la WHERE la.startDate <= :endDate AND la.endDate >= :startDate AND la.deleted = false")
     List<LeaveApplication> findOverlappingLeaves(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
-    Page<LeaveApplication> findByApprovalStatusAndApproverIdAndDeletedFalseOrderByCreateTimeDesc(String pending, Long approverId, Pageable pageable);
+    Page<LeaveApplication> findByApprovalStatusAndApproverIdAndDeletedFalseOrderByCreateTimeDesc(String approvalStatus, Long approverId, Pageable pageable);
+
+    /**
+     * 根据申请人ID和审批状态查询
+     */
+    Page<LeaveApplication> findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(Long applicantId, String approvalStatus, Pageable pageable);
+
+    /**
+     * 根据审批人ID和审批状态查询
+     */
+    Page<LeaveApplication> findByApproverIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(Long approverId, String approvalStatus, Pageable pageable);
 }
