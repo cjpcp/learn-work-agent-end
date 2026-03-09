@@ -94,6 +94,30 @@ public class HumanTransferService {
     }
 
     /**
+     * 直接处理转接记录（分配并回复）
+     */
+    @Transactional
+    public void process(Long transferId, Long staffId, String reply) {
+        HumanTransfer transfer = humanTransferRepository.findById(transferId)
+                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "转接记录不存在"));
+
+        // 分配给当前工作人员
+        transfer.setStaffId(staffId);
+        transfer.setStaffReply(reply);
+        transfer.setStatus("COMPLETED");
+        transfer.setProcessTime(LocalDateTime.now());
+        humanTransferRepository.save(transfer);
+
+        // 更新问题答案
+        ConsultationQuestion question = consultationQuestionRepository.findById(transfer.getQuestionId())
+                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "咨询问题不存在"));
+        question.setAiAnswer(reply);
+        question.setAnswerSource("HUMAN");
+        question.setStatus("ANSWERED");
+        consultationQuestionRepository.save(question);
+    }
+
+    /**
      * 分页查询用户的转接记录
      */
     public PageResult<HumanTransfer> getUserTransfers(Long userId, PageRequest pageRequest) {
@@ -124,10 +148,41 @@ public class HumanTransferService {
                 Sort.by(Sort.Direction.DESC, "createTime")
         );
 
+        // 只查询未完成的记录（PENDING或PROCESSING状态）
         Page<HumanTransfer> page = humanTransferRepository
-                .findByStaffIdAndDeletedFalseOrderByCreateTimeDesc(staffId, pageable);
+                .findByStaffIdAndStatusInAndDeletedFalseOrderByCreateTimeDesc(
+                        staffId, 
+                        java.util.Arrays.asList("PENDING", "PROCESSING"), 
+                        pageable
+                );
 
-        return new PageResult<>(
+        return new PageResult<HumanTransfer>(
+                page.getContent(),
+                page.getTotalElements(),
+                pageRequest.getPageNum(),
+                pageRequest.getPageSize()
+        );
+    }
+
+    /**
+     * 分页查询工作人员已完成的转接记录
+     */
+    public PageResult<HumanTransfer> getCompletedTransfers(Long staffId, PageRequest pageRequest) {
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                pageRequest.getPage(),
+                pageRequest.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "processTime")
+        );
+
+        // 查询已完成的记录（COMPLETED状态）
+        Page<HumanTransfer> page = humanTransferRepository
+                .findByStaffIdAndStatusAndDeletedFalseOrderByCreateTimeDesc(
+                        staffId, 
+                        "COMPLETED", 
+                        pageable
+                );
+
+        return new PageResult<HumanTransfer>(
                 page.getContent(),
                 page.getTotalElements(),
                 pageRequest.getPageNum(),

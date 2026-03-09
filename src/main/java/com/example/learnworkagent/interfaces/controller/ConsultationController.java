@@ -384,6 +384,21 @@ public class ConsultationController extends BaseController {
     }
 
     /**
+     * 直接处理转接记录（分配并回复）
+     *
+     * @param id 转人工记录id
+     * @param reply 回复内容
+     * @return 处理结果
+     */
+    @Operation(summary = "直接处理转接记录")
+    @PostMapping("/transfers/{id}/process")
+    public Result<Void> process(@PathVariable Long id, @RequestParam String reply) {
+        Long staffId = getCurrentUserId();
+        humanTransferService.process(id, staffId, reply);
+        return Result.success();
+    }
+
+    /**
      * 分页查询工作人员的转接记录
      *
      * @param pageRequest 分页参数：页码，每页数量
@@ -394,6 +409,20 @@ public class ConsultationController extends BaseController {
     public Result<PageResult<HumanTransfer>> getStaffTransfers(@Valid PageRequest pageRequest) {
         Long staffId = getCurrentUserId();
         PageResult<HumanTransfer> result = humanTransferService.getStaffTransfers(staffId, pageRequest);
+        return Result.success(result);
+    }
+
+    /**
+     * 分页查询工作人员已完成的转接记录
+     *
+     * @param pageRequest 分页参数：页码，每页数量
+     * @return 分页查询结果
+     */
+    @Operation(summary = "分页查询工作人员已完成的转接记录")
+    @GetMapping("/transfers/completed")
+    public Result<PageResult<HumanTransfer>> getCompletedTransfers(@Valid PageRequest pageRequest) {
+        Long staffId = getCurrentUserId();
+        PageResult<HumanTransfer> result = humanTransferService.getCompletedTransfers(staffId, pageRequest);
         return Result.success(result);
     }
 
