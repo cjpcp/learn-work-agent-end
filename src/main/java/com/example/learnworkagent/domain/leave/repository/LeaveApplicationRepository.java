@@ -54,4 +54,14 @@ public interface LeaveApplicationRepository extends JpaRepository<LeaveApplicati
      * 根据审批人ID和审批状态查询
      */
     Page<LeaveApplication> findByApproverIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(Long approverId, String approvalStatus, Pageable pageable);
+
+    /**
+     * 根据ID列表和审批状态查询
+     */
+    Page<LeaveApplication> findAllByIdInAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(List<Long> ids, String approvalStatus, Pageable pageable);
+
+    /**
+     * 根据审批人ID和审批状态列表查询
+     */
+    Page<LeaveApplication> findByApproverIdAndApprovalStatusInAndDeletedFalseOrderByApprovalTimeDesc(Long approverId, List<String> approvalStatuses, Pageable pageable);
 }

@@ -4,6 +4,8 @@ import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
+import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
+import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
 import com.example.learnworkagent.domain.approval.service.ApprovalService;
 import com.example.learnworkagent.domain.award.dto.AwardApplicationRequest;
 import com.example.learnworkagent.domain.award.entity.AwardApplication;
@@ -250,6 +252,22 @@ public class AwardApplicationService {
         application.setApprovalTime(LocalDateTime.now());
 
         awardApplicationRepository.save(application);
+
+        // 更新审批任务状态
+        try {
+            ApprovalInstance approvalInstance = approvalService.getApprovalInstance("AWARD", applicationId);
+            if (approvalInstance != null) {
+                List<ApprovalTask> tasks = approvalService.getPendingTasks(approverId);
+                for (ApprovalTask task : tasks) {
+                    if (task.getInstance().getId().equals(approvalInstance.getId())) {
+                        approvalService.processApprovalTask(task.getId(), approverId, approvalStatus, approvalComment);
+                        break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("更新审批任务状态失败", e);
+        }
 
         // 发送审批结果通知（多渠道推送）
         sendApprovalNotification(application, approverId);

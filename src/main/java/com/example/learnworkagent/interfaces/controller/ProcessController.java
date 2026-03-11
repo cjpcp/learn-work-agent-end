@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/process")
 @RequiredArgsConstructor
@@ -24,6 +26,12 @@ public class ProcessController extends BaseController {
     public Result<ProcessListResponse> getProcessList(@AuthenticationPrincipal User user) {
         ProcessListResponse response = processService.getProcessList(user);
         return Result.success(response);
+    }
+
+    @GetMapping("/completed")
+    public Result<List<ProcessItem>> getCompletedProcesses(@AuthenticationPrincipal User user) {
+        List<ProcessItem> completedProcesses = processService.getCompletedProcesses(user);
+        return Result.success(completedProcesses);
     }
 
     @GetMapping("/{id}")

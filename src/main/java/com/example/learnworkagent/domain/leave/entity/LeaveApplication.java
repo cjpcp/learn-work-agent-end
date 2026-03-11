@@ -80,7 +80,7 @@ public class LeaveApplication extends BaseEntity {
      */
     @Comment("审批状态")
     @Column(name = "approval_status", nullable = false, length = 20)
-    private String approvalStatus = "PENDING";
+    private String approvalStatus;
 
     /**
      * 审批意见

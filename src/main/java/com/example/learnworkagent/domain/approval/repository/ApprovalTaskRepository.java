@@ -27,4 +27,9 @@ public interface ApprovalTaskRepository extends JpaRepository<ApprovalTask, Long
      * 根据审批实例和步骤查询任务
      */
     List<ApprovalTask> findByInstanceAndStepId(ApprovalInstance instance, Long stepId);
+
+    /**
+     * 根据审批人ID和状态列表查询任务
+     */
+    List<ApprovalTask> findByApproverIdAndStatusIn(Long approverId, List<String> statuses);
 }

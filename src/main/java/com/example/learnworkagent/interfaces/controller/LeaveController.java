@@ -72,19 +72,7 @@ public class LeaveController extends BaseController {
         return Result.success(result);
     }
 
-    /**
-     * 分页查询待审批的申请（审批人）
-     *
-     * @param pageRequest 分页参数
-     * @return 分页查询结果
-     */
-    @Operation(summary = "分页查询待审批的申请（审批人）")
-    @GetMapping("/applications/pending")
-    public Result<PageResult<LeaveApplication>> getPendingApplications(@Valid PageRequest pageRequest) {
-        Long approverId = getCurrentUserId();
-        PageResult<LeaveApplication> result = leaveApplicationService.getPendingApplications(approverId, pageRequest);
-        return Result.success(result);
-    }
+
 
     /**
      * 审批请假申请
@@ -140,7 +128,7 @@ public class LeaveController extends BaseController {
         
         // 如果请假条尚未生成，自动生成
         if (application.getLeaveSlipUrl() == null || application.getLeaveSlipUrl().isEmpty()) {
-            leaveApplicationService.generateLeaveSlip(id);
+            leaveApplicationService.generateLeaveSlip(application);
             // 重新获取更新后的申请信息
             application = leaveApplicationService.getApplicationById(id);
         }

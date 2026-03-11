@@ -33,14 +33,14 @@ public class AuthService {
     /**
      * 登录
      *
-     * @param request 用户名和密码
+     * @param request 学号/工号和密码
      * @return token和用户具体信息
      */
     public LoginResponse login(LoginRequest request) {
 
-        //根据用户名查找用户，如果不存在则抛出异常
-        User user = userRepository.findByUsernameAndDeletedFalse(request.getUsername())
-                .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "用户名或密码错误"));
+        //根据学号/工号查找用户，如果不存在则抛出异常
+        User user = userRepository.findByStudentNoAndDeletedFalse(request.getStudentNo())
+                .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "学号/工号或密码错误"));
 
         //非活跃用户判断，如果是非活跃用户抛出异常
         if (user.getStatus() != UserStatusEnum.ACTIVE) {
@@ -52,17 +52,21 @@ public class AuthService {
 
         //验证用户密码，不正确抛出异常
         if (!passwordEncoder.matches(decryptedPassword, user.getPassword())) {
-            throw new BusinessException(ResultCode.UNAUTHORIZED, "用户名或密码错误");
+            throw new BusinessException(ResultCode.UNAUTHORIZED, "学号/工号或密码错误");
         }
 
         //生成token
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole().getCode());
+        String token = jwtUtil.generateToken(user.getId(), user.getStudentNo(), user.getRole().getCode());
 
         //构建登录响应并返回
+        return getLoginResponse(token, user);
+    }
+
+    private static LoginResponse getLoginResponse(String token, User user) {
         LoginResponse response = new LoginResponse();
         response.setToken(token);
         response.setUserId(user.getId());
-        response.setUsername(user.getUsername());
+        response.setUsername(user.getStudentNo());
         response.setRealName(user.getRealName());
         response.setRole(user.getRole().getCode());
         response.setDepartment(user.getDepartment());
@@ -71,7 +75,6 @@ public class AuthService {
         response.setClassName(user.getClassName());
         response.setWorkDepartment(user.getWorkDepartment());
         response.setPosition(user.getPosition());
-
         return response;
     }
 
@@ -84,9 +87,7 @@ public class AuthService {
                          String department, Long departmentId, String grade, String className,
                          String workDepartment, Long workDepartmentId, String position) {
 
-        if (userRepository.findByUsernameAndDeletedFalse(username).isPresent()) {
-            throw new BusinessException(ResultCode.USER_ALREADY_EXISTS);
-        }
+
 
         if (studentNo != null && !studentNo.trim().isEmpty() && userRepository.findByStudentNoAndDeletedFalse(studentNo).isPresent()) {
             throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "学号/工号已存在");

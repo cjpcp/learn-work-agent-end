@@ -4,6 +4,8 @@ import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
+import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
+import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.service.ApprovalService;
 import com.example.learnworkagent.domain.leave.dto.LeaveApplicationRequest;
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
@@ -18,11 +20,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -118,16 +124,33 @@ public class LeaveApplicationService {
             throw new BusinessException(ResultCode.PARAM_ERROR, "该申请已处理，无法重复审批");
         }
 
+        // 更新审批任务状态
+        try {
+            ApprovalInstance approvalInstance = approvalService.getApprovalInstance("LEAVE", applicationId);
+            if (approvalInstance != null) {
+                List<ApprovalTask> tasks = approvalService.getPendingTasks(approverId);
+                for (ApprovalTask task : tasks) {
+                    if (task.getInstance().getId().equals(approvalInstance.getId())) {
+                        approvalService.processApprovalTask(task.getId(), approverId, approvalStatus, approvalComment);
+                        break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("更新审批任务状态失败", e);
+        }
+
+        // 更新请假申请状态
         application.setApproverId(approverId);
         application.setApprovalStatus(approvalStatus);
         application.setApprovalComment(approvalComment);
         application.setApprovalTime(LocalDateTime.now());
 
-        leaveApplicationRepository.save(application);
+        application = leaveApplicationRepository.save(application);
 
         // 当审批通过时，自动生成请假条
         if ("APPROVED".equals(approvalStatus)) {
-            generateLeaveSlip(applicationId);
+            generateLeaveSlip(application);
         }
 
         // 发送审批结果通知（多渠道推送）
@@ -215,7 +238,14 @@ public class LeaveApplicationService {
     public void generateLeaveSlip(Long applicationId) {
         LeaveApplication application = leaveApplicationRepository.findById(applicationId)
                 .orElseThrow(() -> new BusinessException(ResultCode.LEAVE_APPLICATION_NOT_FOUND));
+        generateLeaveSlip(application);
+    }
 
+    /**
+     * 生成请假条
+     */
+    @Transactional
+    public void generateLeaveSlip(LeaveApplication application) {
         if (!"APPROVED".equals(application.getApprovalStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "只有已批准的申请才能生成请假条");
         }
@@ -229,12 +259,12 @@ public class LeaveApplicationService {
             MultipartFile pdfFile = new MultipartFile() {
                 @Override
                 public String getName() {
-                    return "leave-slip-" + applicationId + ".pdf";
+                    return "leave-slip-" + application.getId() + ".pdf";
                 }
 
                 @Override
                 public String getOriginalFilename() {
-                    return "leave-slip-" + applicationId + ".pdf";
+                    return "leave-slip-" + application.getId() + ".pdf";
                 }
 
                 @Override
@@ -337,16 +367,56 @@ public class LeaveApplicationService {
      * 分页查询待审批的申请（审批人）
      */
     public PageResult<LeaveApplication> getPendingApplications(Long approverId, PageRequest pageRequest) {
+        // 获取审批人的待审批任务
+        List<ApprovalTask> pendingTasks = approvalService.getPendingTasks(approverId);
+        
+        // 提取请假申请的ID
+        List<Long> applicationIds = pendingTasks.stream()
+                .filter(task -> "LEAVE".equals(task.getInstance().getBusinessType()))
+                .map(task -> task.getInstance().getBusinessId())
+                .collect(Collectors.toList());
+        
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 pageRequest.getPage(),
                 pageRequest.getPageSize(),
                 Sort.by(Sort.Direction.DESC, "createTime")
         );
+        
+        Page<LeaveApplication> page;
+        if (applicationIds.isEmpty()) {
+            // 如果没有待审批任务，返回空页
+            page = new PageImpl<>(Collections.emptyList(), pageable, 0);
+        } else {
+            // 根据申请ID列表查询请假申请
+            page = leaveApplicationRepository.findAllByIdInAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(
+                    applicationIds, "PENDING", pageable
+            );
+        }
+
+        return new PageResult<LeaveApplication>(
+                page.getContent(),
+                page.getTotalElements(),
+                pageRequest.getPageNum(),
+                pageRequest.getPageSize()
+        );
+    }
+
+    /**
+     * 分页查询已审批的申请（审批人）
+     */
+    public PageResult<LeaveApplication> getApprovedApplications(Long approverId, PageRequest pageRequest) {
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                pageRequest.getPage(),
+                pageRequest.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "approvalTime")
+        );
 
         Page<LeaveApplication> page = leaveApplicationRepository
-                .findByApprovalStatusAndApproverIdAndDeletedFalseOrderByCreateTimeDesc("PENDING", approverId, pageable);
+                .findByApproverIdAndApprovalStatusInAndDeletedFalseOrderByApprovalTimeDesc(
+                        approverId, Arrays.asList("APPROVED", "REJECTED"), pageable
+                );
 
-        return new PageResult<>(
+        return new PageResult<LeaveApplication>(
                 page.getContent(),
                 page.getTotalElements(),
                 pageRequest.getPageNum(),
