@@ -2,6 +2,8 @@ package com.example.learnworkagent.domain.user.service;
 
 import com.example.learnworkagent.common.dto.LoginRequest;
 import com.example.learnworkagent.common.dto.LoginResponse;
+import com.example.learnworkagent.common.enums.RoleEnum;
+import com.example.learnworkagent.common.enums.UserStatusEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.util.JwtUtil;
@@ -39,7 +41,7 @@ public class AuthService {
                 .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "用户名或密码错误"));
 
         //非活跃用户判断，如果是非活跃用户抛出异常
-        if (!"ACTIVE".equals(user.getStatus())) {
+        if (user.getStatus() != UserStatusEnum.ACTIVE) {
             throw new BusinessException(ResultCode.UNAUTHORIZED, "用户已被禁用");
         }
 
@@ -49,7 +51,7 @@ public class AuthService {
         }
 
         //生成token
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
+        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole().getCode());
 
         //构建登录响应并返回
         LoginResponse response = new LoginResponse();
@@ -57,7 +59,7 @@ public class AuthService {
         response.setUserId(user.getId());
         response.setUsername(user.getUsername());
         response.setRealName(user.getRealName());
-        response.setRole(user.getRole());
+        response.setRole(user.getRole().getCode());
         response.setDepartment(user.getDepartment());
         response.setGrade(user.getGrade());
         response.setClassName(user.getClassName());
@@ -74,14 +76,16 @@ public class AuthService {
     public User register(String username, String password, String realName,
                          String studentNo, String phone, String email, String role,
                          String department, String grade, String className,
-                         String workDepartment, String position) {
+                         String workDepartment, Long workDepartmentId, String position) {
 
-        //根据用户名进行查询，如果已存在则进行报错
         if (userRepository.findByUsernameAndDeletedFalse(username).isPresent()) {
             throw new BusinessException(ResultCode.USER_ALREADY_EXISTS);
         }
 
-        //构建用户并保存
+        if (studentNo != null && !studentNo.trim().isEmpty() && userRepository.findByStudentNoAndDeletedFalse(studentNo).isPresent()) {
+            throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "学号/工号已存在");
+        }
+
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(password));
@@ -89,14 +93,22 @@ public class AuthService {
         user.setStudentNo(studentNo);
         user.setPhone(phone);
         user.setEmail(email);
-        user.setRole(role != null ? role : "STUDENT");
-        user.setStatus("ACTIVE");
+        user.setRole(role != null ? RoleEnum.getByCode(role) : RoleEnum.STUDENT);
+        user.setStatus(UserStatusEnum.ACTIVE);
         user.setDepartment(department);
         user.setGrade(grade);
         user.setClassName(className);
         user.setWorkDepartment(workDepartment);
+        user.setWorkDepartmentId(workDepartmentId);
         user.setPosition(position);
 
         return userRepository.save(user);
+    }
+
+    public boolean checkStudentNoExists(String studentNo) {
+        if (studentNo == null || studentNo.trim().isEmpty()) {
+            return false;
+        }
+        return userRepository.findByStudentNoAndDeletedFalse(studentNo).isPresent();
     }
 }

@@ -1,9 +1,11 @@
 package com.example.learnworkagent.domain.user.repository;
 
+import com.example.learnworkagent.common.enums.RoleEnum;
 import com.example.learnworkagent.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -26,4 +28,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 判断用户名是否存在
      */
     boolean existsByUsernameAndDeletedFalse(String username);
+
+    /**
+     * 根据工作部门和角色查询
+     */
+    List<User> findByWorkDepartmentAndRole(String workDepartment, RoleEnum role);
+
+    /**
+     * 根据工作部门ID和角色查询
+     */
+    List<User> findByWorkDepartmentIdAndRole(Long workDepartmentId, RoleEnum role);
+
+    /**
+     * 根据工作部门、职位和角色查询
+     */
+    List<User> findByWorkDepartmentAndPositionAndRole(String workDepartment, String position, RoleEnum role);
 }

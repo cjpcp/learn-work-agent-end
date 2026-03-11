@@ -4,6 +4,7 @@ import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
+import com.example.learnworkagent.domain.approval.service.ApprovalService;
 import com.example.learnworkagent.domain.award.dto.AwardApplicationRequest;
 import com.example.learnworkagent.domain.award.entity.AwardApplication;
 import com.example.learnworkagent.domain.award.repository.AwardApplicationRepository;
@@ -12,6 +13,7 @@ import com.example.learnworkagent.domain.notification.service.NotificationServic
 import com.example.learnworkagent.domain.user.entity.User;
 import com.example.learnworkagent.domain.user.repository.UserRepository;
 import com.example.learnworkagent.infrastructure.external.dify.DifyWorkflowService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -24,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +42,8 @@ public class AwardApplicationService {
     private final DifyWorkflowService difyWorkflowService;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
+    private final ApprovalService approvalService;
+    private final ObjectMapper objectMapper;
 
     /**
      * 提交奖助申请
@@ -67,6 +72,22 @@ public class AwardApplicationService {
 
         // 异步进行材料预审
         preCheckMaterialsAsync(saved.getId());
+
+        // 创建审批流程实例
+        try {
+            HashMap<String, Object> applicantInfo = new HashMap<>();
+            applicantInfo.put("department", request.getDepartment());
+            applicantInfo.put("grade", request.getGrade());
+            applicantInfo.put("className", request.getClassName());
+            applicantInfo.put("studentName", request.getStudentName());
+            applicantInfo.put("applicationType", request.getApplicationType());
+
+            String applicantInfoJson = objectMapper.writeValueAsString(applicantInfo);
+            approvalService.createApprovalInstance("AWARD", saved.getId(), applicantId, applicantInfoJson);
+        } catch (Exception e) {
+            log.error("创建审批流程失败", e);
+            // 审批流程创建失败不影响申请提交
+        }
 
         return saved;
     }

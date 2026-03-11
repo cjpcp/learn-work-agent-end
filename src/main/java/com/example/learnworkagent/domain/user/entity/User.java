@@ -1,7 +1,10 @@
 package com.example.learnworkagent.domain.user.entity;
 
 import com.example.learnworkagent.common.BaseEntity;
+import com.example.learnworkagent.common.enums.RoleEnum;
+import com.example.learnworkagent.common.enums.UserStatusEnum;
 import jakarta.persistence.*;
+import org.hibernate.annotations.Comment;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -11,84 +14,107 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Entity
+@Comment("用户表")
 @Table(name = "sys_user")
 public class User extends BaseEntity {
 
     /**
      * 用户名
      */
+    @Comment("用户名")
     @Column(name = "username", nullable = false, unique = true, length = 50)
     private String username;
 
     /**
      * 密码（加密后）
      */
+    @Comment("密码（加密后）")
     @Column(name = "password", nullable = false, length = 255)
     private String password;
 
     /**
      * 真实姓名
      */
+    @Comment("真实姓名")
     @Column(name = "real_name", length = 50)
     private String realName;
 
     /**
      * 学号/工号
      */
+    @Comment("学号/工号")
     @Column(name = "student_no", length = 50)
     private String studentNo;
 
     /**
      * 手机号
      */
+    @Comment("手机号")
     @Column(name = "phone", length = 20)
     private String phone;
 
     /**
      * 邮箱
      */
+    @Comment("邮箱")
     @Column(name = "email", length = 100)
     private String email;
 
     /**
-     * 角色（STUDENT-学生, COUNSELOR-辅导员, ADMIN-管理员）
+     * 角色
      */
+    @Comment("角色")
     @Column(name = "role", nullable = false, length = 20)
-    private String role;
+    @Enumerated(EnumType.STRING)
+    private RoleEnum role;
 
     /**
-     * 状态（ACTIVE-激活, INACTIVE-禁用）
+     * 状态
      */
+    @Comment("状态")
     @Column(name = "status", nullable = false, length = 20)
-    private String status = "ACTIVE";
+    @Enumerated(EnumType.STRING)
+    private UserStatusEnum status = UserStatusEnum.ACTIVE;
 
     /**
      * 院系（学生角色使用）
      */
+    @Comment("院系（学生角色使用）")
     @Column(name = "department", length = 100)
     private String department;
 
     /**
      * 年级（学生角色使用）
      */
+    @Comment("年级（学生角色使用）")
     @Column(name = "grade", length = 20)
     private String grade;
 
     /**
      * 班级（学生角色使用）
      */
+    @Comment("班级（学生角色使用）")
     @Column(name = "class_name", length = 50)
     private String className;
 
     /**
      * 所属部门（辅导员/学工角色使用）
      */
+    @Comment("所属部门（辅导员/学工角色使用）")
     @Column(name = "work_department", length = 100)
     private String workDepartment;
 
     /**
+     * 所属部门ID
+     */
+    @Comment("所属部门ID")
+    @Column(name = "work_department_id")
+    private Long workDepartmentId;
+
+    /**
      * 职位（辅导员/学工角色使用）
      */
+    @Comment("职位（辅导员/学工角色使用）")
     @Column(name = "position", length = 50)
     private String position;
 }

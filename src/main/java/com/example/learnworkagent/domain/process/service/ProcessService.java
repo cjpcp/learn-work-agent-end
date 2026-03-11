@@ -7,6 +7,8 @@ import com.example.learnworkagent.domain.leave.repository.LeaveApplicationReposi
 import com.example.learnworkagent.domain.award.entity.AwardApplication;
 import com.example.learnworkagent.domain.award.repository.AwardApplicationRepository;
 import com.example.learnworkagent.domain.user.entity.User;
+import com.example.learnworkagent.domain.approval.repository.ApprovalTaskRepository;
+import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ public class ProcessService {
 
     private final LeaveApplicationRepository leaveApplicationRepository;
     private final AwardApplicationRepository awardApplicationRepository;
+    private final ApprovalTaskRepository approvalTaskRepository;
 
     public ProcessListResponse getProcessList(User user) {
         ProcessListResponse response = new ProcessListResponse();
@@ -104,79 +107,21 @@ public class ProcessService {
             }
         } else if ("COUNSELOR".equals(user.getRole())) {
             // 辅导员角色：待办流程是分配给自己的未审批，已办理流程是自己已审批的
-            // 获取辅导员待处理的请假申请
-            var pendingLeaveApps = leaveApplicationRepository.findByApproverIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(user.getId(), "PENDING", PageRequest.of(0, 100));
-            for (LeaveApplication app : pendingLeaveApps.getContent()) {
+            // 获取辅导员待处理的审批任务
+            List<ApprovalTask> pendingTasks = approvalTaskRepository.findByApproverIdAndStatus(user.getId(), "PENDING");
+            for (ApprovalTask task : pendingTasks) {
                 ProcessItem item = new ProcessItem();
-                item.setId(app.getId().toString());
-                item.setName("请假审批");
-                item.setType("leave");
-                item.setCreateTime(app.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                item.setId(task.getInstance().getBusinessId().toString());
+                item.setName(task.getInstance().getBusinessType().equals("LEAVE") ? "请假审批" : "奖助审批");
+                item.setType(task.getInstance().getBusinessType().toLowerCase());
+                item.setCreateTime(task.getInstance().getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                 item.setStatus("pending");
-                item.setDescription("学生的请假申请需要您审批");
+                item.setDescription(task.getInstance().getBusinessType().equals("LEAVE") ? "学生的请假申请需要您审批" : "学生的奖助申请需要您审批");
                 pending.add(item);
             }
 
-            // 获取辅导员已处理的请假申请
-            var approvedLeaveApps = leaveApplicationRepository.findByApproverIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(user.getId(), "APPROVED", PageRequest.of(0, 100));
-            var rejectedLeaveApps = leaveApplicationRepository.findByApproverIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(user.getId(), "REJECTED", PageRequest.of(0, 100));
-            for (LeaveApplication app : approvedLeaveApps.getContent()) {
-                ProcessItem item = new ProcessItem();
-                item.setId(app.getId().toString());
-                item.setName("请假审批");
-                item.setType("leave");
-                item.setCreateTime(app.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                item.setStatus("completed");
-                item.setDescription("学生的请假申请已批准");
-                completed.add(item);
-            }
-            for (LeaveApplication app : rejectedLeaveApps.getContent()) {
-                ProcessItem item = new ProcessItem();
-                item.setId(app.getId().toString());
-                item.setName("请假审批");
-                item.setType("leave");
-                item.setCreateTime(app.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                item.setStatus("completed");
-                item.setDescription("学生的请假申请已拒绝");
-                completed.add(item);
-            }
-
-            // 获取辅导员待处理的奖助申请
-            var pendingAwardApps = awardApplicationRepository.findByApproverIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(user.getId(), "PENDING", PageRequest.of(0, 100));
-            for (AwardApplication app : pendingAwardApps.getContent()) {
-                ProcessItem item = new ProcessItem();
-                item.setId(app.getId().toString());
-                item.setName("奖助审批");
-                item.setType("award");
-                item.setCreateTime(app.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                item.setStatus("pending");
-                item.setDescription("学生的奖助申请需要您审批");
-                pending.add(item);
-            }
-
-            // 获取辅导员已处理的奖助申请
-            var approvedAwardApps = awardApplicationRepository.findByApproverIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(user.getId(), "APPROVED", PageRequest.of(0, 100));
-            var rejectedAwardApps = awardApplicationRepository.findByApproverIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(user.getId(), "REJECTED", PageRequest.of(0, 100));
-            for (AwardApplication app : approvedAwardApps.getContent()) {
-                ProcessItem item = new ProcessItem();
-                item.setId(app.getId().toString());
-                item.setName("奖助审批");
-                item.setType("award");
-                item.setCreateTime(app.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                item.setStatus("completed");
-                item.setDescription("学生的奖助申请已批准");
-                completed.add(item);
-            }
-            for (AwardApplication app : rejectedAwardApps.getContent()) {
-                ProcessItem item = new ProcessItem();
-                item.setId(app.getId().toString());
-                item.setName("奖助审批");
-                item.setType("award");
-                item.setCreateTime(app.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                item.setStatus("completed");
-                item.setDescription("学生的奖助申请已拒绝");
-                completed.add(item);
-            }
+            // 暂时不处理已完成的审批任务
+            // TODO: 实现已完成审批任务的查询
         }
 
         response.setPending(pending);

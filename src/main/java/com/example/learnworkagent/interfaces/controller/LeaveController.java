@@ -38,6 +38,9 @@ public class LeaveController extends BaseController {
     @PostMapping("/applications")
     public Result<LeaveApplication> submitApplication(@Valid @RequestBody LeaveApplicationRequest request) {
         Long userId = getCurrentUserId();
+        if (userId == null) {
+            return Result.fail("用户未登录，无法提交请假申请");
+        }
         LeaveApplication application = leaveApplicationService.submitLeaveApplication(userId, request);
         return Result.success(application);
     }

@@ -51,13 +51,27 @@ public class AuthController extends BaseController {
                 user.getStudentNo(),
                 user.getPhone(),
                 user.getEmail(),
-                user.getRole(),
+                user.getRole() != null ? user.getRole().getCode() : null,
                 user.getDepartment(),
                 user.getGrade(),
                 user.getClassName(),
                 user.getWorkDepartment(),
+                user.getWorkDepartmentId(),
                 user.getPosition()
         );
         return Result.success(registered);
+    }
+
+    /**
+     * 检查学号/工号是否存在
+     *
+     * @param studentNo 学号/工号
+     * @return 是否存在
+     */
+    @Operation(summary = "检查学号/工号是否存在")
+    @GetMapping("/check-student-no")
+    public Result<Boolean> checkStudentNo(@RequestParam String studentNo) {
+        boolean exists = authService.checkStudentNoExists(studentNo);
+        return Result.success(exists);
     }
 }

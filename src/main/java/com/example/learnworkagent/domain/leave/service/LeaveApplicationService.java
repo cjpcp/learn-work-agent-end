@@ -4,6 +4,7 @@ import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
+import com.example.learnworkagent.domain.approval.service.ApprovalService;
 import com.example.learnworkagent.domain.leave.dto.LeaveApplicationRequest;
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.repository.LeaveApplicationRepository;
@@ -13,6 +14,7 @@ import com.example.learnworkagent.domain.user.entity.User;
 import com.example.learnworkagent.domain.user.repository.UserRepository;
 import com.example.learnworkagent.infrastructure.external.oss.OssService;
 import com.example.learnworkagent.infrastructure.external.template.TemplateService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -31,6 +33,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.HashMap;
 
 /**
  * 请假申请服务
@@ -45,6 +48,8 @@ public class LeaveApplicationService {
     private final OssService ossService;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
+    private final ApprovalService approvalService;
+    private final ObjectMapper objectMapper;
 
     /**
      * 提交请假申请
@@ -77,7 +82,25 @@ public class LeaveApplicationService {
         application.setGrade(request.getGrade());
         application.setClassName(request.getClassName());
 
-        return leaveApplicationRepository.save(application);
+        // 保存申请
+        LeaveApplication savedApplication = leaveApplicationRepository.save(application);
+
+        // 创建审批流程实例
+        try {
+            HashMap<String, Object> applicantInfo = new HashMap<>();
+            applicantInfo.put("department", request.getDepartment());
+            applicantInfo.put("grade", request.getGrade());
+            applicantInfo.put("className", request.getClassName());
+            applicantInfo.put("studentName", request.getStudentName());
+
+            String applicantInfoJson = objectMapper.writeValueAsString(applicantInfo);
+            approvalService.createApprovalInstance("LEAVE", savedApplication.getId(), applicantId, applicantInfoJson);
+        } catch (Exception e) {
+            log.error("创建审批流程失败", e);
+            // 审批流程创建失败不影响申请提交
+        }
+
+        return savedApplication;
     }
 
     /**
