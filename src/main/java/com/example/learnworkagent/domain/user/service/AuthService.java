@@ -7,6 +7,7 @@ import com.example.learnworkagent.common.enums.UserStatusEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.util.JwtUtil;
+import com.example.learnworkagent.common.util.RsaUtil;
 import com.example.learnworkagent.domain.user.entity.User;
 import com.example.learnworkagent.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final RsaUtil rsaUtil;
 
 
     /**
@@ -45,8 +47,11 @@ public class AuthService {
             throw new BusinessException(ResultCode.UNAUTHORIZED, "用户已被禁用");
         }
 
+        // 解密密码（前端RSA加密传输）
+        String decryptedPassword = rsaUtil.decrypt(request.getPassword());
+
         //验证用户密码，不正确抛出异常
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(decryptedPassword, user.getPassword())) {
             throw new BusinessException(ResultCode.UNAUTHORIZED, "用户名或密码错误");
         }
 
@@ -86,9 +91,12 @@ public class AuthService {
             throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "学号/工号已存在");
         }
 
+        // 解密密码（前端RSA加密传输）
+        String decryptedPassword = rsaUtil.decrypt(password);
+
         User user = new User();
         user.setUsername(username);
-        user.setPassword(passwordEncoder.encode(password));
+        user.setPassword(passwordEncoder.encode(decryptedPassword));
         user.setRealName(realName);
         user.setStudentNo(studentNo);
         user.setPhone(phone);
