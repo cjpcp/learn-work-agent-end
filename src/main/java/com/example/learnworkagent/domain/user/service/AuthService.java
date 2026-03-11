@@ -66,6 +66,7 @@ public class AuthService {
         response.setRealName(user.getRealName());
         response.setRole(user.getRole().getCode());
         response.setDepartment(user.getDepartment());
+        response.setDepartmentId(user.getDepartmentId());
         response.setGrade(user.getGrade());
         response.setClassName(user.getClassName());
         response.setWorkDepartment(user.getWorkDepartment());
@@ -80,7 +81,7 @@ public class AuthService {
     @Transactional
     public User register(String username, String password, String realName,
                          String studentNo, String phone, String email, String role,
-                         String department, String grade, String className,
+                         String department, Long departmentId, String grade, String className,
                          String workDepartment, Long workDepartmentId, String position) {
 
         if (userRepository.findByUsernameAndDeletedFalse(username).isPresent()) {
@@ -104,6 +105,7 @@ public class AuthService {
         user.setRole(role != null ? RoleEnum.getByCode(role) : RoleEnum.STUDENT);
         user.setStatus(UserStatusEnum.ACTIVE);
         user.setDepartment(department);
+        user.setDepartmentId(departmentId);
         user.setGrade(grade);
         user.setClassName(className);
         user.setWorkDepartment(workDepartment);

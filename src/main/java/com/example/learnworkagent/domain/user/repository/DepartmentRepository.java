@@ -33,4 +33,9 @@ public interface DepartmentRepository extends JpaRepository<Department, Long> {
      * 根据类型查询所有启用的部门/学院
      */
     List<Department> findByTypeAndEnabledAndDeletedFalseOrderBySortOrderAsc(DepartmentTypeEnum type, Boolean enabled);
+
+    /**
+     * 根据名称查询部门
+     */
+    Optional<Department> findByNameAndDeletedFalse(String name);
 }

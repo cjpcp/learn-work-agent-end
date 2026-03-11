@@ -160,12 +160,41 @@ public class ApprovalServiceImpl implements ApprovalService {
         List<Long> approvers = new ArrayList<>();
         log.info("查找审批人，审批人角色: {}", step.getApproverRole());
 
+        // 优先使用departmentId查询部门
+        Object departmentIdObj = applicantData.get("departmentId");
         String department = (String) applicantData.get("department");
-        log.info("按院系分配，院系: {}", department);
-        if (department != null) {
+        log.info("按院系分配，院系: {}, 院系ID: {}", department, departmentIdObj);
+        
+        Department dept = null;
+        if (departmentIdObj != null) {
+            try {
+                Long departmentId = Long.valueOf(departmentIdObj.toString());
+                dept = departmentService.getDepartmentById(departmentId);
+                log.info("根据ID查询到部门: {}", dept.getName());
+            } catch (Exception e) {
+                log.error("根据ID查询部门失败: {}", e.getMessage());
+            }
+        }
+        
+        if (dept == null && department != null) {
             RoleEnum roleEnum = RoleEnum.getByCode(step.getApproverRole());
-            // 根据部门代码查询部门信息
-            Department dept = departmentService.getDepartmentByCode(department);
+            try {
+                // 先尝试根据代码查询部门
+                dept = departmentService.getDepartmentByCode(department);
+                log.info("根据代码查询到部门: {}", dept.getName());
+            } catch (Exception e) {
+                try {
+                    // 如果根据代码查询失败，尝试根据名称查询部门
+                    dept = departmentService.getDepartmentByName(department);
+                    log.info("根据名称查询到部门: {}", dept.getName());
+                } catch (Exception ex) {
+                    log.error("查询部门失败: {}", ex.getMessage());
+                }
+            }
+        }
+        
+        if (dept != null) {
+            RoleEnum roleEnum = RoleEnum.getByCode(step.getApproverRole());
             // 使用部门ID查询用户
             List<User> counselors = userRepository.findByWorkDepartmentIdAndRole(dept.getId(), roleEnum);
             log.info("找到 {} 个院系审批人", counselors.size());

@@ -29,6 +29,8 @@ public class LeaveApplicationRequest {
 
     private String department;
 
+    private Long departmentId;
+
     private String grade;
 
     private String className;

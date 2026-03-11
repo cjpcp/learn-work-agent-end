@@ -53,6 +53,7 @@ public class AuthController extends BaseController {
                 user.getEmail(),
                 user.getRole() != null ? user.getRole().getCode() : null,
                 user.getDepartment(),
+                user.getDepartmentId(),
                 user.getGrade(),
                 user.getClassName(),
                 user.getWorkDepartment(),

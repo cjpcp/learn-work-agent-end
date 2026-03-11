@@ -84,6 +84,13 @@ public class User extends BaseEntity {
     private String department;
 
     /**
+     * 院系ID（学生角色使用）
+     */
+    @Comment("院系ID（学生角色使用）")
+    @Column(name = "department_id")
+    private Long departmentId;
+
+    /**
      * 年级（学生角色使用）
      */
     @Comment("年级（学生角色使用）")

@@ -79,25 +79,27 @@ public class LeaveApplicationService {
         application.setApprovalStatus("PENDING");
         application.setStudentName(request.getStudentName());
         application.setDepartment(request.getDepartment());
+        application.setDepartmentId(request.getDepartmentId());
         application.setGrade(request.getGrade());
         application.setClassName(request.getClassName());
+        application.setApprovalStatus("PENDING");
 
-        // 保存申请
         LeaveApplication savedApplication = leaveApplicationRepository.save(application);
 
-        // 创建审批流程实例
+        // 创建审批流程
         try {
+            // 构建申请人信息
             HashMap<String, Object> applicantInfo = new HashMap<>();
+            applicantInfo.put("studentName", request.getStudentName());
             applicantInfo.put("department", request.getDepartment());
+            applicantInfo.put("departmentId", request.getDepartmentId());
             applicantInfo.put("grade", request.getGrade());
             applicantInfo.put("className", request.getClassName());
-            applicantInfo.put("studentName", request.getStudentName());
 
             String applicantInfoJson = objectMapper.writeValueAsString(applicantInfo);
             approvalService.createApprovalInstance("LEAVE", savedApplication.getId(), applicantId, applicantInfoJson);
         } catch (Exception e) {
             log.error("创建审批流程失败", e);
-            // 审批流程创建失败不影响申请提交
         }
 
         return savedApplication;

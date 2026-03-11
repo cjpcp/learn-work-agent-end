@@ -139,6 +139,13 @@ public class LeaveApplication extends BaseEntity {
     private String department;
 
     /**
+     * 院系ID
+     */
+    @Comment("院系ID")
+    @Column(name = "department_id")
+    private Long departmentId;
+
+    /**
      * 年级
      */
     @Comment("年级")

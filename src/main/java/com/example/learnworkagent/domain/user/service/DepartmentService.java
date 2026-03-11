@@ -68,6 +68,14 @@ public class DepartmentService {
     }
 
     /**
+     * 根据名称获取部门
+     */
+    public Department getDepartmentByName(String name) {
+        return departmentRepository.findByNameAndDeletedFalse(name)
+                .orElseThrow(() -> new BusinessException(ResultCode.FAIL, "部门不存在"));
+    }
+
+    /**
      * 创建部门
      */
     @Transactional

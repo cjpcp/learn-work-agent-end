@@ -43,6 +43,11 @@ public class LoginResponse {
     private String department;
 
     /**
+     * 院系ID（学生角色使用）
+     */
+    private Long departmentId;
+
+    /**
      * 年级（学生角色使用）
      */
     private String grade;
