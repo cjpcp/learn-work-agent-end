@@ -51,14 +51,10 @@ public class AuthController extends BaseController {
                 user.getStudentNo(),
                 user.getPhone(),
                 user.getEmail(),
-                user.getRole() != null ? user.getRole().getCode() : null,
-                user.getDepartment(),
+                user.getRole() != null ? user.getRole() : null,
                 user.getDepartmentId(),
                 user.getGrade(),
-                user.getClassName(),
-                user.getWorkDepartment(),
-                user.getWorkDepartmentId(),
-                user.getPosition()
+                user.getClassName()
         );
         return Result.success(registered);
     }

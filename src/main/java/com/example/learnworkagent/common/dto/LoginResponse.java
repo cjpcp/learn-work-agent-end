@@ -63,6 +63,11 @@ public class LoginResponse {
     private String workDepartment;
 
     /**
+     * 所属部门ID（辅导员/学工角色使用）
+     */
+    private Long workDepartmentId;
+
+    /**
      * 职位（辅导员/学工角色使用）
      */
     private String position;

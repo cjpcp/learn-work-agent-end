@@ -84,7 +84,6 @@ public class LeaveApplicationService {
         application.setAttachmentUrl(request.getAttachmentUrl());
         application.setApprovalStatus("PENDING");
         application.setStudentName(request.getStudentName());
-        application.setDepartment(request.getDepartment());
         application.setDepartmentId(request.getDepartmentId());
         application.setGrade(request.getGrade());
         application.setClassName(request.getClassName());
@@ -97,7 +96,6 @@ public class LeaveApplicationService {
             // 构建申请人信息
             HashMap<String, Object> applicantInfo = new HashMap<>();
             applicantInfo.put("studentName", request.getStudentName());
-            applicantInfo.put("department", request.getDepartment());
             applicantInfo.put("departmentId", request.getDepartmentId());
             applicantInfo.put("grade", request.getGrade());
             applicantInfo.put("className", request.getClassName());

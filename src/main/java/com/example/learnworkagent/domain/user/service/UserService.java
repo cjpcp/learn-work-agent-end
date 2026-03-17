@@ -16,12 +16,7 @@ public interface UserService {
     List<User> findAll();
 
     /**
-     * 根据工作部门和角色查询
-     */
-    List<User> findByWorkDepartmentAndRole(String workDepartment, RoleEnum role);
-
-    /**
      * 根据工作部门ID和角色查询
      */
-    List<User> findByWorkDepartmentIdAndRole(Long workDepartmentId, RoleEnum role);
+    List<User> findByDepartmentIdAndRole(Long workDepartmentId, String role);
 }

@@ -15,37 +15,19 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
 
     /**
-     * 根据用户名查询
-     */
-    Optional<User> findByUsernameAndDeletedFalse(String username);
-
-    /**
      * 根据学号查询
      */
     Optional<User> findByStudentNoAndDeletedFalse(String studentNo);
 
     /**
-     * 判断用户名是否存在
-     */
-    boolean existsByUsernameAndDeletedFalse(String username);
-
-    /**
-     * 根据工作部门和角色查询
-     */
-    List<User> findByWorkDepartmentAndRole(String workDepartment, RoleEnum role);
-
-    /**
      * 根据工作部门ID和角色查询
      */
-    List<User> findByWorkDepartmentIdAndRole(Long workDepartmentId, RoleEnum role);
-
-    /**
-     * 根据工作部门、职位和角色查询
-     */
-    List<User> findByWorkDepartmentAndPositionAndRole(String workDepartment, String position, RoleEnum role);
+    List<User> findByDepartmentIdAndRole(Long departmentId, String role);
 
     /**
      * 根据工作部门ID、年级和角色查询
      */
-    List<User> findByWorkDepartmentIdAndGradeAndRole(Long workDepartmentId, String grade, RoleEnum role);
+
+
+    List<User> findByDepartmentIdAndGradeAndRole(Long departmentId, String grade, String role);
 }

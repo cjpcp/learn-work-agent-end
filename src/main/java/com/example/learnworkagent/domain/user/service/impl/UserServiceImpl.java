@@ -24,12 +24,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<User> findByWorkDepartmentAndRole(String workDepartment, RoleEnum role) {
-        return userRepository.findByWorkDepartmentAndRole(workDepartment, role);
-    }
-
-    @Override
-    public List<User> findByWorkDepartmentIdAndRole(Long workDepartmentId, RoleEnum role) {
-        return userRepository.findByWorkDepartmentIdAndRole(workDepartmentId, role);
+    public List<User> findByDepartmentIdAndRole(Long workDepartmentId, String role) {
+        return userRepository.findByDepartmentIdAndRole(workDepartmentId, role);
     }
 }

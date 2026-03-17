@@ -1,6 +1,7 @@
 package com.example.learnworkagent.interfaces.controller;
 
 import com.example.learnworkagent.common.Result;
+
 import com.example.learnworkagent.common.enums.RoleEnum;
 import com.example.learnworkagent.domain.user.entity.Department;
 import com.example.learnworkagent.domain.user.entity.User;
@@ -11,7 +12,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Arrays;
@@ -69,15 +69,7 @@ public class SystemController extends BaseController {
     @GetMapping("/departments")
     public Result<List<Map<String, Object>>> getDepartments() {
         List<Department> departments = departmentService.getEnabledDepartmentsByType();
-        List<Map<String, Object>> result = departments.stream()
-                .map(dept -> Map.<String, Object>of(
-                        "id", dept.getId(),
-                        "code", dept.getCode(),
-                        "name", dept.getName(),
-                        "description", dept.getDescription()
-                ))
-                .collect(Collectors.toList());
-        return Result.success(result);
+        return getListResult(departments);
     }
 
     /**
@@ -87,6 +79,10 @@ public class SystemController extends BaseController {
     @GetMapping("/colleges")
     public Result<List<Map<String, Object>>> getColleges() {
         List<Department> colleges = departmentService.getEnabledColleges();
+        return getListResult(colleges);
+    }
+
+    private Result<List<Map<String, Object>>> getListResult(List<Department> colleges) {
         List<Map<String, Object>> result = colleges.stream()
                 .map(college -> Map.<String, Object>of(
                         "id", college.getId(),
@@ -108,7 +104,7 @@ public class SystemController extends BaseController {
         List<User> users;
         if (departmentId != null) {
             // 使用部门ID查询用户
-            users = userService.findByWorkDepartmentIdAndRole(departmentId, RoleEnum.ADMIN);
+            users = userService.findByDepartmentIdAndRole(departmentId, RoleEnum.DEPARTMENT_LEADER.getCode());
         } else {
             users = userService.findAll();
         }
@@ -118,7 +114,7 @@ public class SystemController extends BaseController {
                     map.put("id", user.getId());
                     map.put("name", user.getRealName());
                     map.put("username", user.getUsername());
-                    map.put("role", user.getRole().getCode());
+                    map.put("role", user.getRole());
                     return map;
                 })
                 .collect(Collectors.toList());

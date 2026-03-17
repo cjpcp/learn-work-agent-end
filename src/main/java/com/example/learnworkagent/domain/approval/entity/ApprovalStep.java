@@ -60,9 +60,9 @@ public class ApprovalStep extends BaseEntity {
     private String approvalType = "SINGLE";
 
     /**
-     * 审批人角色（COUNSELOR-辅导员, DEAN-院长, DIRECTOR-主任）
+     * 审批人角色（COUNSELOR-辅导员, COLLEGE_LEADER-院领导, DEPARTMENT_LEADER-部门领导）
      */
-    @Comment("审批人角色（COUNSELOR-辅导员, DEAN-院长, DIRECTOR-主任）")
+    @Comment("审批人角色（COUNSELOR-辅导员, COLLEGE_LEADER-院领导, DEPARTMENT_LEADER-部门领导）")
     @Column(name = "approver_role", nullable = false, length = 20)
     private String approverRole;
 
@@ -88,9 +88,9 @@ public class ApprovalStep extends BaseEntity {
     private Long approverUserId;
 
     /**
-     * 部门代码
+     * 部门ID（用于部门领导审批步骤筛选）
      */
-    @Comment("部门代码")
-    @Column(name = "department", length = 100)
-    private String department;
+    @Comment("部门ID（用于部门领导审批步骤筛选）")
+    @Column(name = "department_id")
+    private Long departmentId;
 }

@@ -35,7 +35,7 @@ public class ProcessController extends BaseController {
     }
 
     @GetMapping("/{id}")
-    public Result<ProcessItem> getProcessDetail(@PathVariable String id, @RequestParam String type, @AuthenticationPrincipal User user) {
+    public Result<ProcessItem> getProcessDetail(@PathVariable String id, @RequestParam String type) {
         ProcessItem item = processService.getProcessDetail(id, type);
         return Result.success(item);
     }

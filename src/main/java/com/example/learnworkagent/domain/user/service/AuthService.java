@@ -8,6 +8,7 @@ import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.util.JwtUtil;
 import com.example.learnworkagent.common.util.RsaUtil;
+import com.example.learnworkagent.domain.user.entity.Department;
 import com.example.learnworkagent.domain.user.entity.User;
 import com.example.learnworkagent.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final RsaUtil rsaUtil;
+    private final DepartmentService departmentService;
 
 
     /**
@@ -56,25 +58,28 @@ public class AuthService {
         }
 
         //生成token
-        String token = jwtUtil.generateToken(user.getId(), user.getStudentNo(), user.getRole().getCode());
+        String token = jwtUtil.generateToken(user.getId(), user.getStudentNo(), user.getRole());
 
         //构建登录响应并返回
         return getLoginResponse(token, user);
     }
 
-    private static LoginResponse getLoginResponse(String token, User user) {
+    private LoginResponse getLoginResponse(String token, User user) {
         LoginResponse response = new LoginResponse();
         response.setToken(token);
         response.setUserId(user.getId());
         response.setUsername(user.getStudentNo());
         response.setRealName(user.getRealName());
-        response.setRole(user.getRole().getCode());
-        response.setDepartment(user.getDepartment());
+        response.setRole(user.getRole());
         response.setDepartmentId(user.getDepartmentId());
         response.setGrade(user.getGrade());
         response.setClassName(user.getClassName());
-        response.setWorkDepartment(user.getWorkDepartment());
-        response.setPosition(user.getPosition());
+
+        // 仅在需要展示时，通过ID补齐名称（查询全部走ID）
+        if (user.getDepartmentId() != null) {
+            Department dept = departmentService.getDepartmentById(user.getDepartmentId());
+            response.setDepartment(dept.getName());
+        }
         return response;
     }
 
@@ -84,8 +89,8 @@ public class AuthService {
     @Transactional
     public User register(String username, String password, String realName,
                          String studentNo, String phone, String email, String role,
-                         String department, Long departmentId, String grade, String className,
-                         String workDepartment, Long workDepartmentId, String position) {
+                         Long departmentId, String grade, String className
+                         ) {
 
 
 
@@ -98,20 +103,17 @@ public class AuthService {
 
         User user = new User();
         user.setUsername(username);
+        System.out.println(passwordEncoder.encode("ADMIN"));
         user.setPassword(passwordEncoder.encode(decryptedPassword));
         user.setRealName(realName);
         user.setStudentNo(studentNo);
         user.setPhone(phone);
         user.setEmail(email);
-        user.setRole(role != null ? RoleEnum.getByCode(role) : RoleEnum.STUDENT);
+        user.setRole(role != null ? role : RoleEnum.STUDENT.getCode());
         user.setStatus(UserStatusEnum.ACTIVE);
-        user.setDepartment(department);
         user.setDepartmentId(departmentId);
         user.setGrade(grade);
         user.setClassName(className);
-        user.setWorkDepartment(workDepartment);
-        user.setWorkDepartmentId(workDepartmentId);
-        user.setPosition(position);
 
         return userRepository.save(user);
     }

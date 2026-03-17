@@ -41,7 +41,7 @@ public class AwardApplicationRequest {
 
     private String studentName;
 
-    private String department;
+    private Long departmentId;
 
     private String grade;
 

@@ -1,7 +1,6 @@
 package com.example.learnworkagent.domain.user.entity;
 
 import com.example.learnworkagent.common.BaseEntity;
-import com.example.learnworkagent.common.enums.RoleEnum;
 import com.example.learnworkagent.common.enums.UserStatusEnum;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Comment;
@@ -65,8 +64,7 @@ public class User extends BaseEntity {
      */
     @Comment("角色")
     @Column(name = "role", nullable = false, length = 20)
-    @Enumerated(EnumType.STRING)
-    private RoleEnum role;
+    private String role;
 
     /**
      * 状态
@@ -77,21 +75,14 @@ public class User extends BaseEntity {
     private UserStatusEnum status = UserStatusEnum.ACTIVE;
 
     /**
-     * 院系（学生角色使用）
+     * 部门ID（学生，辅导员指学院，领导指部门）
      */
-    @Comment("院系（学生角色使用）")
-    @Column(name = "department", length = 100)
-    private String department;
-
-    /**
-     * 院系ID（学生角色使用）
-     */
-    @Comment("院系ID（学生角色使用）")
+    @Comment("部门ID（学生，辅导员指学院，领导指部门）")
     @Column(name = "department_id")
     private Long departmentId;
 
     /**
-     * 年级（学生角色使用）
+     * 年级（学生，辅导员角色使用）
      */
     @Comment("年级（学生角色使用）")
     @Column(name = "grade", length = 20)
@@ -104,24 +95,4 @@ public class User extends BaseEntity {
     @Column(name = "class_name", length = 50)
     private String className;
 
-    /**
-     * 所属部门（辅导员/学工角色使用）
-     */
-    @Comment("所属部门（辅导员/学工角色使用）")
-    @Column(name = "work_department", length = 100)
-    private String workDepartment;
-
-    /**
-     * 所属部门ID
-     */
-    @Comment("所属部门ID")
-    @Column(name = "work_department_id")
-    private Long workDepartmentId;
-
-    /**
-     * 职位（辅导员/学工角色使用）
-     */
-    @Comment("职位（辅导员/学工角色使用）")
-    @Column(name = "position", length = 50)
-    private String position;
 }

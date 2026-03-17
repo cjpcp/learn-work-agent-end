@@ -66,7 +66,7 @@ public class AwardApplicationService {
         application.setMaterialStatus("PENDING");
         application.setApprovalStatus("PENDING");
         application.setStudentName(request.getStudentName());
-        application.setDepartment(request.getDepartment());
+        application.setDepartmentId(request.getDepartmentId());
         application.setGrade(request.getGrade());
         application.setClassName(request.getClassName());
 
@@ -78,7 +78,7 @@ public class AwardApplicationService {
         // 创建审批流程实例
         try {
             HashMap<String, Object> applicantInfo = new HashMap<>();
-            applicantInfo.put("department", request.getDepartment());
+            applicantInfo.put("departmentId", request.getDepartmentId());
             applicantInfo.put("grade", request.getGrade());
             applicantInfo.put("className", request.getClassName());
             applicantInfo.put("studentName", request.getStudentName());

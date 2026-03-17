@@ -2,7 +2,6 @@ package com.example.learnworkagent.domain.process.dto;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
 
 @Data
 public class ProcessItem {

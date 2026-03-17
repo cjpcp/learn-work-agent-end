@@ -7,10 +7,12 @@ import lombok.Getter;
  */
 @Getter
 public enum RoleEnum {
+    ADMIN("ADMIN", "管理员"),
     STUDENT("STUDENT", "学生"),
     COUNSELOR("COUNSELOR", "辅导员"),
-    DEAN("DEAN", "院领导"),
-    ADMIN("ADMIN", "部门领导");
+    COLLEGE_LEADER("COLLEGE_LEADER", "院领导"),
+    DEPARTMENT_LEADER("DEPARTMENT_LEADER", "部门领导");
+
 
     private final String code;
     private final String name;
@@ -36,7 +38,7 @@ public enum RoleEnum {
      * 获取所有学工角色
      */
     public static RoleEnum[] getStaffRoles() {
-        return new RoleEnum[]{COUNSELOR, DEAN, ADMIN};
+        return new RoleEnum[]{COUNSELOR, COLLEGE_LEADER, DEPARTMENT_LEADER};
     }
 
     /**
