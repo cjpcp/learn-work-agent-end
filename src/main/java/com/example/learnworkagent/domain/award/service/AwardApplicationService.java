@@ -154,6 +154,7 @@ public class AwardApplicationService {
 
             // 根据申请类型检查必需材料
             String applicationType = application.getApplicationType();
+            //todo
             if ("SCHOLARSHIP".equals(applicationType)) {
                 // 奖学金需要成绩单、推荐信等
                 return checkScholarshipMaterials(result);

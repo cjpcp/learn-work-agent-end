@@ -1,7 +1,6 @@
 package com.example.learnworkagent.domain.approval.service.impl;
 
 import com.example.learnworkagent.common.enums.RoleEnum;
-import com.example.learnworkagent.common.enums.UserStatusEnum;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.entity.ApprovalProcess;
 import com.example.learnworkagent.domain.approval.entity.ApprovalStep;
@@ -55,7 +54,7 @@ public class ApprovalServiceImpl implements ApprovalService {
     public ApprovalInstance createApprovalInstance(String businessType, Long businessId, Long applicantId, String applicantInfo) {
         // 查找对应业务类型的启用流程
         Optional<ApprovalProcess> processOptional = processRepository.findByProcessTypeAndEnabledTrue(businessType);
-        if (!processOptional.isPresent()) {
+        if (processOptional.isEmpty()) {
             throw new RuntimeException("未找到启用的审批流程: " + businessType);
         }
 
@@ -86,6 +85,7 @@ public class ApprovalServiceImpl implements ApprovalService {
     @Override
     @Transactional
     public ApprovalTask processApprovalTask(Long taskId, Long approverId, String status, String comment) {
+
         // 获取审批任务
         ApprovalTask task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("审批任务不存在: " + taskId));
@@ -108,7 +108,8 @@ public class ApprovalServiceImpl implements ApprovalService {
 
         // 更新审批实例状态
         updateInstanceStatus(task.getInstance());
-
+        ApprovalInstance instance = task.getInstance();
+        sendApprovalNotification(approverId, instance.getBusinessType(), instance.getBusinessId());
         return task;
     }
 
@@ -157,13 +158,14 @@ public class ApprovalServiceImpl implements ApprovalService {
      * 查找审批人
      */
     private List<Long> findApprovers(ApprovalStep step, Map<String, Object> applicantData) {
+
         List<Long> approvers = new ArrayList<>();
         log.info("查找审批人，审批人角色: {}", step.getApproverRole());
-
         // 优先使用departmentId查询部门
         Object departmentIdObj = applicantData.get("departmentId");
         String department = (String) applicantData.get("department");
-        log.info("按院系分配，院系: {}, 院系ID: {}", department, departmentIdObj);
+        String grade = (String) applicantData.get("grade");
+        log.info("按院系和年级分配，院系: {}, 院系ID: {}, 年级: {}", department, departmentIdObj, grade);
         
         Department dept = null;
         if (departmentIdObj != null) {
@@ -195,18 +197,37 @@ public class ApprovalServiceImpl implements ApprovalService {
         
         if (dept != null) {
             RoleEnum roleEnum = RoleEnum.getByCode(step.getApproverRole());
-            // 使用部门ID查询用户
-            List<User> counselors = userRepository.findByWorkDepartmentIdAndRole(dept.getId(), roleEnum);
-            log.info("找到 {} 个院系审批人", counselors.size());
-            for (User user : counselors) {
-                approvers.add(user.getId());
-                log.info("添加审批人: {} (ID: {})", user.getRealName(), user.getId());
+            
+            // 首先尝试根据部门ID和年级查询审批人
+            if (grade != null && !grade.isEmpty()) {
+                List<User> counselorsByGrade = userRepository.findByWorkDepartmentIdAndGradeAndRole(dept.getId(), grade, roleEnum);
+                log.info("找到 {} 个院系+年级审批人", counselorsByGrade.size());
+                for (User user : counselorsByGrade) {
+                    approvers.add(user.getId());
+                    log.info("添加审批人: {} (ID: {})", user.getRealName(), user.getId());
+                }
+            }
+            
+            // 如果根据年级找不到审批人，再尝试根据部门ID查询
+            if (approvers.isEmpty()) {
+                List<User> counselors = userRepository.findByWorkDepartmentIdAndRole(dept.getId(), roleEnum);
+                log.info("找到 {} 个院系审批人", counselors.size());
+                for (User user : counselors) {
+                    approvers.add(user.getId());
+                    log.info("添加审批人: {} (ID: {})", user.getRealName(), user.getId());
+                }
             }
         } else {
             log.warn("院系信息为空，无法分配审批人");
         }
 
         log.info("最终找到 {} 个审批人", approvers.size());
+        
+        // 如果找不到审批人，向前端报错
+        if (approvers.isEmpty()) {
+            throw new RuntimeException("未找到合适的审批人，请联系管理员");
+        }
+        
         return approvers;
     }
 

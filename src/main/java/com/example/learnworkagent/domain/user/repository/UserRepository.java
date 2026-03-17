@@ -43,4 +43,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 根据工作部门、职位和角色查询
      */
     List<User> findByWorkDepartmentAndPositionAndRole(String workDepartment, String position, RoleEnum role);
+
+    /**
+     * 根据工作部门ID、年级和角色查询
+     */
+    List<User> findByWorkDepartmentIdAndGradeAndRole(Long workDepartmentId, String grade, RoleEnum role);
 }

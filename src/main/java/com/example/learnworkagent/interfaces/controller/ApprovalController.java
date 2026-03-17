@@ -45,6 +45,9 @@ public class ApprovalController extends BaseController {
 
     /**
      * 获取审批详情
+     * @param businessType 业务类型 （请假、奖助）
+     * @param businessId 业务ID
+     * @return 审批详情
      */
     @Operation(summary = "获取审批详情")
     @GetMapping("/instances/{businessType}/{businessId}")
