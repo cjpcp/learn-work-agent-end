@@ -17,16 +17,4 @@ public enum UserStatusEnum {
         this.code = code;
         this.name = name;
     }
-
-    /**
-     * 根据代码获取枚举
-     */
-    public static UserStatusEnum getByCode(String code) {
-        for (UserStatusEnum status : values()) {
-            if (status.code.equals(code)) {
-                return status;
-            }
-        }
-        return null;
-    }
 }

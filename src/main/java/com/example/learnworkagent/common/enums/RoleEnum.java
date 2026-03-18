@@ -22,17 +22,6 @@ public enum RoleEnum {
         this.name = name;
     }
 
-    /**
-     * 根据代码获取枚举
-     */
-    public static RoleEnum getByCode(String code) {
-        for (RoleEnum role : values()) {
-            if (role.code.equals(code)) {
-                return role;
-            }
-        }
-        return null;
-    }
 
     /**
      * 获取所有学工角色
@@ -41,24 +30,4 @@ public enum RoleEnum {
         return new RoleEnum[]{COUNSELOR, COLLEGE_LEADER, DEPARTMENT_LEADER};
     }
 
-    /**
-     * 获取所有学生角色
-     */
-    public static RoleEnum[] getStudentRoles() {
-        return new RoleEnum[]{STUDENT};
-    }
-
-    /**
-     * 判断是否为学工角色
-     */
-    public boolean isStaff() {
-        return this != STUDENT;
-    }
-
-    /**
-     * 判断是否为学生角色
-     */
-    public boolean isStudent() {
-        return this == STUDENT;
-    }
 }
