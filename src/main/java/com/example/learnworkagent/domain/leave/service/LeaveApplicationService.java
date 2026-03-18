@@ -4,9 +4,9 @@ import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
-import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.service.ApprovalService;
+import com.example.learnworkagent.domain.award.service.AwardApplicationService;
 import com.example.learnworkagent.domain.leave.dto.LeaveApplicationRequest;
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.repository.LeaveApplicationRepository;
@@ -19,16 +19,13 @@ import com.example.learnworkagent.infrastructure.external.template.TemplateServi
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -74,20 +71,7 @@ public class LeaveApplicationService {
         // 计算请假天数
         long days = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
 
-        LeaveApplication application = new LeaveApplication();
-        application.setApplicantId(applicantId);
-        application.setLeaveType(request.getLeaveType());
-        application.setStartDate(request.getStartDate());
-        application.setEndDate(request.getEndDate());
-        application.setDays((int) days);
-        application.setReason(request.getReason());
-        application.setAttachmentUrl(request.getAttachmentUrl());
-        application.setApprovalStatus("PENDING");
-        application.setStudentName(request.getStudentName());
-        application.setDepartmentId(request.getDepartmentId());
-        application.setGrade(request.getGrade());
-        application.setClassName(request.getClassName());
-        application.setApprovalStatus("PENDING");
+        LeaveApplication application = getLeaveApplication(applicantId, request, (int) days);
 
         LeaveApplication savedApplication = leaveApplicationRepository.save(application);
 
@@ -109,6 +93,24 @@ public class LeaveApplicationService {
         return savedApplication;
     }
 
+    private static LeaveApplication getLeaveApplication(Long applicantId, LeaveApplicationRequest request, int days) {
+        LeaveApplication application = new LeaveApplication();
+        application.setApplicantId(applicantId);
+        application.setLeaveType(request.getLeaveType());
+        application.setStartDate(request.getStartDate());
+        application.setEndDate(request.getEndDate());
+        application.setDays(days);
+        application.setReason(request.getReason());
+        application.setAttachmentUrl(request.getAttachmentUrl());
+        application.setApprovalStatus("PENDING");
+        application.setStudentName(request.getStudentName());
+        application.setDepartmentId(request.getDepartmentId());
+        application.setGrade(request.getGrade());
+        application.setClassName(request.getClassName());
+        application.setApprovalStatus("PENDING");
+        return application;
+    }
+
     /**
      * 审批请假申请
      */
@@ -125,15 +127,7 @@ public class LeaveApplicationService {
         // 更新审批任务状态
         try {
             ApprovalInstance approvalInstance = approvalService.getApprovalInstance("LEAVE", applicationId);
-            if (approvalInstance != null) {
-                List<ApprovalTask> tasks = approvalService.getPendingTasks(approverId);
-                for (ApprovalTask task : tasks) {
-                    if (task.getInstance().getId().equals(approvalInstance.getId())) {
-                        approvalService.processApprovalTask(task.getId(), approverId, approvalStatus, approvalComment);
-                        break;
-                    }
-                }
-            }
+            AwardApplicationService.updateTaskStatus(approverId, approvalStatus, approvalComment, approvalInstance, approvalService);
         } catch (Exception e) {
             log.error("更新审批任务状态失败", e);
         }
@@ -156,7 +150,7 @@ public class LeaveApplicationService {
     }
 
     /**
-     * 发送审批结果通知
+     * 发送请假审批结果通知
      *
      * @param application 请假申请
      * @param approverId  审批人ID
@@ -172,7 +166,7 @@ public class LeaveApplicationService {
                     .orElse(null);
 
             if (applicant == null) {
-                log.warn("申请人不存在，无法发送通知，用户ID: {}", application.getApplicantId());
+                log.warn("请假申请人不存在，无法发送通知，用户ID: {}", application.getApplicantId());
                 return;
             }
 
@@ -251,11 +245,13 @@ public class LeaveApplicationService {
         try {
             // 生成请假条PDF
             byte[] pdfBytes = templateService.generateLeaveSlip(application);
-            
+
             // 上传到OSS
             // 创建MultipartFile对象
             MultipartFile pdfFile = new MultipartFile() {
+
                 @Override
+                @NotNull
                 public String getName() {
                     return "leave-slip-" + application.getId() + ".pdf";
                 }
@@ -281,12 +277,12 @@ public class LeaveApplicationService {
                 }
 
                 @Override
-                public byte[] getBytes() throws IOException {
+                public byte @NotNull [] getBytes() {
                     return pdfBytes;
                 }
 
                 @Override
-                public InputStream getInputStream() throws IOException {
+                public @NotNull InputStream getInputStream() {
                     return new ByteArrayInputStream(pdfBytes);
                 }
 
@@ -295,15 +291,15 @@ public class LeaveApplicationService {
                     Files.write(dest.toPath(), pdfBytes);
                 }
             };
-            
+
             // 上传到OSS
             String fileUrl = ossService.uploadFile(pdfFile, "leave-slips");
-            
+
             // 更新请假条状态和URL
             application.setLeaveSlipStatus("GENERATED");
             application.setLeaveSlipUrl(fileUrl);
             leaveApplicationRepository.save(application);
-            
+
             log.info("请假条生成成功，URL: {}", fileUrl);
         } catch (Exception e) {
             log.error("生成请假条失败: {}", e.getMessage(), e);
@@ -354,67 +350,6 @@ public class LeaveApplicationService {
                 .findByApplicantIdAndDeletedFalseOrderByCreateTimeDesc(userId, pageable);
 
         return new PageResult<>(
-                page.getContent(),
-                page.getTotalElements(),
-                pageRequest.getPageNum(),
-                pageRequest.getPageSize()
-        );
-    }
-
-    /**
-     * 分页查询待审批的申请（审批人）
-     */
-    public PageResult<LeaveApplication> getPendingApplications(Long approverId, PageRequest pageRequest) {
-        // 获取审批人的待审批任务
-        List<ApprovalTask> pendingTasks = approvalService.getPendingTasks(approverId);
-        
-        // 提取请假申请的ID
-        List<Long> applicationIds = pendingTasks.stream()
-                .filter(task -> "LEAVE".equals(task.getInstance().getBusinessType()))
-                .map(task -> task.getInstance().getBusinessId())
-                .collect(Collectors.toList());
-        
-        Pageable pageable = org.springframework.data.domain.PageRequest.of(
-                pageRequest.getPage(),
-                pageRequest.getPageSize(),
-                Sort.by(Sort.Direction.DESC, "createTime")
-        );
-        
-        Page<LeaveApplication> page;
-        if (applicationIds.isEmpty()) {
-            // 如果没有待审批任务，返回空页
-            page = new PageImpl<>(Collections.emptyList(), pageable, 0);
-        } else {
-            // 根据申请ID列表查询请假申请
-            page = leaveApplicationRepository.findAllByIdInAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(
-                    applicationIds, "PENDING", pageable
-            );
-        }
-
-        return new PageResult<LeaveApplication>(
-                page.getContent(),
-                page.getTotalElements(),
-                pageRequest.getPageNum(),
-                pageRequest.getPageSize()
-        );
-    }
-
-    /**
-     * 分页查询已审批的申请（审批人）
-     */
-    public PageResult<LeaveApplication> getApprovedApplications(Long approverId, PageRequest pageRequest) {
-        Pageable pageable = org.springframework.data.domain.PageRequest.of(
-                pageRequest.getPage(),
-                pageRequest.getPageSize(),
-                Sort.by(Sort.Direction.DESC, "approvalTime")
-        );
-
-        Page<LeaveApplication> page = leaveApplicationRepository
-                .findByApproverIdAndApprovalStatusInAndDeletedFalseOrderByApprovalTimeDesc(
-                        approverId, Arrays.asList("APPROVED", "REJECTED"), pageable
-                );
-
-        return new PageResult<LeaveApplication>(
                 page.getContent(),
                 page.getTotalElements(),
                 pageRequest.getPageNum(),

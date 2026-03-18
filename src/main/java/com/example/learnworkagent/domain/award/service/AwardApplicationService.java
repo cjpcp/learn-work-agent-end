@@ -257,15 +257,7 @@ public class AwardApplicationService {
         // 更新审批任务状态
         try {
             ApprovalInstance approvalInstance = approvalService.getApprovalInstance("AWARD", applicationId);
-            if (approvalInstance != null) {
-                List<ApprovalTask> tasks = approvalService.getPendingTasks(approverId);
-                for (ApprovalTask task : tasks) {
-                    if (task.getInstance().getId().equals(approvalInstance.getId())) {
-                        approvalService.processApprovalTask(task.getId(), approverId, approvalStatus, approvalComment);
-                        break;
-                    }
-                }
-            }
+            updateTaskStatus(approverId, approvalStatus, approvalComment, approvalInstance, approvalService);
         } catch (Exception e) {
             log.error("更新审批任务状态失败", e);
         }
@@ -274,8 +266,20 @@ public class AwardApplicationService {
         sendApprovalNotification(application, approverId);
     }
 
+    public static void updateTaskStatus(Long approverId, String approvalStatus, String approvalComment, ApprovalInstance approvalInstance, ApprovalService approvalService) {
+        if (approvalInstance != null) {
+            List<ApprovalTask> tasks = approvalService.getPendingTasks(approverId);
+            for (ApprovalTask task : tasks) {
+                if (task.getInstance().getId().equals(approvalInstance.getId())) {
+                    approvalService.processApprovalTask(task.getId(), approverId, approvalStatus, approvalComment);
+                    break;
+                }
+            }
+        }
+    }
+
     /**
-     * 发送审批结果通知
+     * 发送奖助审批结果通知
      *
      * @param application 奖助申请
      * @param approverId  审批人ID
@@ -291,7 +295,7 @@ public class AwardApplicationService {
                     .orElse(null);
 
             if (applicant == null) {
-                log.warn("申请人不存在，无法发送通知，用户ID: {}", application.getApplicantId());
+                log.warn("奖助申请人不存在，无法发送通知，用户ID: {}", application.getApplicantId());
                 return;
             }
 
