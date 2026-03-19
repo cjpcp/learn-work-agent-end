@@ -69,7 +69,7 @@ public class AwardController extends BaseController {
     @GetMapping("/applications/my")
     public Result<PageResult<AwardApplication>> getMyApplications(@Valid PageRequest pageRequest) {
         Long userId = getCurrentUserId();
-        log.info("用户id:{}",userId);
+        log.info("用户id:{}", userId);
         PageResult<AwardApplication> result = awardApplicationService.getUserApplications(userId, pageRequest);
         return Result.success(result);
     }
@@ -114,14 +114,14 @@ public class AwardController extends BaseController {
     public Result<List<String>> uploadAttachments(@RequestParam("files") MultipartFile[] files) {
         Long userId = getCurrentUserId();
         List<String> fileUrls = new ArrayList<>();
-        
+
         for (MultipartFile file : files) {
             if (!file.isEmpty()) {
                 String fileUrl = ossService.uploadAwardFile(file, userId);
                 fileUrls.add(fileUrl);
             }
         }
-        
+
         return Result.success("文件上传成功", fileUrls);
     }
 } 

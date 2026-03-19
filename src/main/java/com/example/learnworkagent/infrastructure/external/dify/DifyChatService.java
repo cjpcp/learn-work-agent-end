@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -60,7 +59,7 @@ public class DifyChatService {
 
         Map<String, Object> requestBody = buildChatRequestBody(query, fileUrls, conversationId, user);
 
-        log.info("调用Dify聊天API，query: {}, user: {}, 文件数: {}", query, user, 
+        log.info("调用Dify聊天API，query: {}, user: {}, 文件数: {}", query, user,
                 fileUrls != null ? fileUrls.size() : 0);
         log.debug("请求体: {}", requestBody);
 
@@ -79,14 +78,14 @@ public class DifyChatService {
                             // 只移除"data:"前缀，不trim以保留内容中的换行和空格
                             jsonStr = chunk.substring(5);
                         }
-                        
+
                         // 跳过[DONE]标记
                         if ("[DONE]".equals(jsonStr)) {
                             return "";
                         }
-                        
+
                         JsonNode jsonNode = objectMapper.readTree(jsonStr);
-                        
+
                         // Dify流式响应中，delta.text包含增量内容
                         JsonNode eventNode = jsonNode.get("event");
                         if (eventNode != null && "message".equals(eventNode.asText())) {
@@ -187,18 +186,6 @@ public class DifyChatService {
         }
 
         return "document";
-    }
-
-    /**
-     * 调用Dify聊天API进行智能咨询（流式响应，使用默认用户标识）
-     *
-     * @param query          用户问题
-     * @param fileUrls       文件URL列表（可选）
-     * @param conversationId 对话ID（可选）
-     * @return 流式响应
-     */
-    public Flux<String> chatStream(String query, List<String> fileUrls, String conversationId) {
-        return chatStream(query, fileUrls, conversationId, "default-user");
     }
 
     /**

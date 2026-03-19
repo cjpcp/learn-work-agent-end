@@ -90,13 +90,13 @@ public class DifyWorkflowService {
 
     private static Map<String, Object> getStringObjectMap(List<String> fileUrls, String user) {
         List<Map<String, Object>> files = new ArrayList<>();
-        for (String url : fileUrls) {
+        fileUrls.forEach(url -> {
             Map<String, Object> file = new HashMap<>();
             file.put("transfer_method", "remote_url");
             file.put("url", url);
             file.put("type", determineFileType(url));
             files.add(file);
-        }
+        });
 
         Map<String, Object> inputs = new HashMap<>();
         inputs.put("file", files);

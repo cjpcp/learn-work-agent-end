@@ -203,7 +203,7 @@ public class ConsultationController extends BaseController {
                         Map<String, String> data = new HashMap<>();
                         data.put("answer", chunk);
                         String jsonData = objectMapper.writeValueAsString(data);
-                        
+
                         log.debug("发送SSE数据，userId: {}, chunk长度: {}, chunk内容: {}", userId, chunk.length(), chunk);
                         emitter.send(SseEmitter.event().data(jsonData));
                         log.info("成功发送SSE数据，userId: {}, chunk: {}", userId, chunk);
@@ -265,8 +265,8 @@ public class ConsultationController extends BaseController {
         final Long userId = getCurrentUserId();
         final String user = userId != null ? String.valueOf(userId) : "anonymous";
 
-        log.info("收到Dify智能咨询请求，user: {}, query: {}, conversationId: {}, 文件数: {}", 
-                user, request.getQuery(), request.getConversationId(), 
+        log.info("收到Dify智能咨询请求，user: {}, query: {}, conversationId: {}, 文件数: {}",
+                user, request.getQuery(), request.getConversationId(),
                 request.getFiles() != null ? request.getFiles().size() : 0);
 
         SseEmitter emitter = new SseEmitter(120000L);
@@ -345,19 +345,19 @@ public class ConsultationController extends BaseController {
         Long userId = getCurrentUserId();
         HumanTransfer transfer = humanTransferRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "转人工记录不存在"));
-        
+
         // 验证权限，只能查看自己的转人工记录
         if (!transfer.getStaffId().equals(userId)) {
             throw new BusinessException(ResultCode.FORBIDDEN, "无权查看此转人工记录");
         }
-        
+
         return Result.success(transfer);
     }
 
     /**
      * 分配工作人员
      *
-     * @param id 转人工记录id
+     * @param id      转人工记录id
      * @param staffId 工作人员id
      * @return 分配结果
      */
@@ -371,7 +371,7 @@ public class ConsultationController extends BaseController {
     /**
      * 工作人员回复
      *
-     * @param id 转人工记录id
+     * @param id    转人工记录id
      * @param reply 回复内容
      * @return 回复结果
      */
@@ -386,7 +386,7 @@ public class ConsultationController extends BaseController {
     /**
      * 直接处理转接记录（分配并回复）
      *
-     * @param id 转人工记录id
+     * @param id    转人工记录id
      * @param reply 回复内容
      * @return 处理结果
      */

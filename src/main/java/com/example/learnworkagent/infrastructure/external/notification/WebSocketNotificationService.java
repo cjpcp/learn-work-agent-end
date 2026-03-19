@@ -50,20 +50,6 @@ public class WebSocketNotificationService {
     }
 
     /**
-     * 广播通知（用于系统公告等）
-     *
-     * @param notification 通知内容
-     */
-    public void broadcastNotification(Notification notification) {
-        try {
-            messagingTemplate.convertAndSend("/topic/notifications", notification);
-            log.info("广播通知已发送，通知ID: {}", notification.getId());
-        } catch (Exception e) {
-            log.error("广播通知发送失败", e);
-        }
-    }
-
-    /**
      * 未读数量消息
      */
     public record UnreadCountMessage(long count) {

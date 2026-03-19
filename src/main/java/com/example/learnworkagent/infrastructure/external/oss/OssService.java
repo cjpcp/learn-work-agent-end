@@ -42,7 +42,7 @@ public class OssService {
     /**
      * 上传文件到OSS
      *
-     * @param file 上传的文件
+     * @param file   上传的文件
      * @param folder 存储文件夹
      * @return 文件在OSS上的URL
      */
@@ -97,7 +97,7 @@ public class OssService {
     /**
      * 上传奖助申请相关文件
      *
-     * @param file 上传的文件
+     * @param file   上传的文件
      * @param userId 用户ID
      * @return 文件在OSS上的URL
      */
@@ -108,8 +108,8 @@ public class OssService {
     /**
      * 上传咨询相关文件（图片或语音）
      *
-     * @param file 上传的文件
-     * @param userId 用户ID
+     * @param file     上传的文件
+     * @param userId   用户ID
      * @param fileType 文件类型（image或voice）
      * @return 文件在OSS上的URL
      */

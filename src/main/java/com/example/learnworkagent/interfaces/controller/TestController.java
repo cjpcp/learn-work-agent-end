@@ -16,7 +16,6 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -50,8 +49,6 @@ public class TestController {
     private final DifyChatService difyChatService;
 
 
-
-
     /**
      * 健康检查接口
      *
@@ -73,7 +70,7 @@ public class TestController {
     @GetMapping("/leave/generate-slip/{applicationId}")
     public Result<String> testGenerateLeaveSlip(@PathVariable Long applicationId) {
         log.info("测试生成请假条，申请ID: {}", applicationId);
-        
+
         try {
             leaveApplicationService.generateLeaveSlip(applicationId);
             return Result.success("请假条生成成功", "请假条已生成并上传到OSS");
@@ -123,7 +120,7 @@ public class TestController {
 
         try {
             notificationService.sendAwardApprovalNotification(message);
-            return Result.success("通知已发送到消息队列", 
+            return Result.success("通知已发送到消息队列",
                     String.format("渠道: %s，请查看日志确认发送结果", channels));
         } catch (Exception e) {
             log.error("通知发送失败", e);
@@ -339,7 +336,7 @@ public class TestController {
 
         return difyFileUploadService.uploadFileByPath(filePath, user)
                 .map(response -> {
-                    log.info("Dify文件上传成功，文件ID: {}", response.getId());
+                    log.info("Dify文件（本地路径）上传成功，文件ID: {}", response.getId());
                     return Result.success("文件上传成功", response);
                 })
                 .onErrorResume(error -> {

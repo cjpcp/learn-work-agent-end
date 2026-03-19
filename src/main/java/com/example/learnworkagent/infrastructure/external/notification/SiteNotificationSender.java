@@ -4,7 +4,6 @@ import com.example.learnworkagent.domain.notification.entity.Notification;
 import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
 import com.example.learnworkagent.domain.notification.repository.NotificationRepository;
 import com.example.learnworkagent.domain.notification.service.NotificationSender;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -20,7 +19,7 @@ public class SiteNotificationSender implements NotificationSender {
     private final WebSocketNotificationService webSocketNotificationService;
 
     public SiteNotificationSender(NotificationRepository notificationRepository,
-                                   @Lazy WebSocketNotificationService webSocketNotificationService) {
+                                  @Lazy WebSocketNotificationService webSocketNotificationService) {
         this.notificationRepository = notificationRepository;
         this.webSocketNotificationService = webSocketNotificationService;
     }

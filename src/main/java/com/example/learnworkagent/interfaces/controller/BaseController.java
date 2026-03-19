@@ -22,16 +22,4 @@ public abstract class BaseController {
         }
         return null;
     }
-
-    /**
-     * 获取当前用户名（从SecurityContext中获取）
-     * todo将当前用户名存储到SecurityContext的authentication的name中
-     */
-    protected String getCurrentUsername() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getName() != null) {
-            return authentication.getName();
-        }
-        return null;
-    }
 }

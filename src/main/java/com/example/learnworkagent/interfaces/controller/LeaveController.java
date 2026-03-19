@@ -71,7 +71,6 @@ public class LeaveController extends BaseController {
     }
 
 
-
     /**
      * 审批请假申请
      *
@@ -116,21 +115,21 @@ public class LeaveController extends BaseController {
     /**
      * 下载请假条PDF
      *
-     * @param id 请假id
+     * @param id       请假id
      * @param response HTTP响应
      */
     @Operation(summary = "下载请假条PDF", description = "下载已生成的请假条PDF文件")
     @GetMapping("/applications/{id}/download-slip")
     public void downloadLeaveSlip(@PathVariable Long id, HttpServletResponse response) {
         LeaveApplication application = leaveApplicationService.getApplicationById(id);
-        
+
         // 如果请假条尚未生成，自动生成
         if (application.getLeaveSlipUrl() == null || application.getLeaveSlipUrl().isEmpty()) {
             leaveApplicationService.generateLeaveSlip(application);
             // 重新获取更新后的申请信息
             application = leaveApplicationService.getApplicationById(id);
         }
-        
+
         try {
             // 重定向到OSS文件URL
             response.sendRedirect(application.getLeaveSlipUrl());
