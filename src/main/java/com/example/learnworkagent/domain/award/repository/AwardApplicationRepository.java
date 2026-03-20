@@ -4,13 +4,14 @@ import com.example.learnworkagent.domain.award.entity.AwardApplication;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 /**
  * 奖助申请仓库
  */
 @Repository
-public interface AwardApplicationRepository extends JpaRepository<AwardApplication, Long> {
+public interface AwardApplicationRepository extends JpaRepository<AwardApplication, Long>, JpaSpecificationExecutor<AwardApplication> {
 
     /**
      * 根据申请人ID分页查询

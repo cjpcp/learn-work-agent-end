@@ -42,7 +42,7 @@ public class ApprovalTask extends BaseEntity {
     private Long approverId;
 
     /**
-     * 审批状态（PENDING-待审批, APPROVED-已批准, REJECTED-已拒绝）
+     * 审批状态（PENDING-待审批, PROCESSING-进行中, APPROVED-已批准, REJECTED-已拒绝）
      */
     @Comment("审批状态")
     @Column(name = "status", nullable = false, length = 20)

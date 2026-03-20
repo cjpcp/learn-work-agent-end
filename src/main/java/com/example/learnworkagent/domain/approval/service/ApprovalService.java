@@ -42,4 +42,11 @@ public interface ApprovalService {
      * @return 待审批任务列表
      */
     java.util.List<ApprovalTask> getPendingTasks(Long approverId);
+
+    /**
+     * 获取实例当前进行中的审批任务
+     * @param instance 审批实例
+     * @return 当前任务
+     */
+    java.util.List<ApprovalTask> getCurrentTasks(ApprovalInstance instance);
 }

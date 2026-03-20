@@ -83,7 +83,9 @@ public class ProcessService {
     }
 
     private void getPendingTasks(User user, List<ProcessItem> pending) {
-        List<ApprovalTask> pendingTasks = approvalTaskRepository.findByApproverIdAndStatus(user.getId(), "PENDING");
+        List<ApprovalTask> pendingTasks =new ArrayList<>();
+//        pendingTasks.addAll(approvalTaskRepository.findByApproverIdAndStatus(user.getId(), "PENDING"));
+        pendingTasks.addAll(approvalTaskRepository.findByApproverIdAndStatus(user.getId(), "PROCESSING"));
         for (ApprovalTask task : pendingTasks) {
             ProcessItem item = new ProcessItem();
             item.setId(task.getInstance().getBusinessId().toString());

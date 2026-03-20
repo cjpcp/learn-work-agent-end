@@ -4,6 +4,7 @@ import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -15,7 +16,7 @@ import java.util.List;
  * 请假申请仓库
  */
 @Repository
-public interface LeaveApplicationRepository extends JpaRepository<LeaveApplication, Long> {
+public interface LeaveApplicationRepository extends JpaRepository<LeaveApplication, Long>, JpaSpecificationExecutor<LeaveApplication> {
 
     /**
      * 根据申请人ID分页查询

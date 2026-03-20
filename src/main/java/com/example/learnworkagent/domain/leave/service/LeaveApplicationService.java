@@ -5,8 +5,8 @@ import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
+import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
 import com.example.learnworkagent.domain.approval.service.ApprovalService;
-import com.example.learnworkagent.domain.award.service.AwardApplicationService;
 import com.example.learnworkagent.domain.leave.dto.LeaveApplicationRequest;
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.repository.LeaveApplicationRepository;
@@ -23,6 +23,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,6 +38,8 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * 请假申请服务
@@ -117,36 +120,36 @@ public class LeaveApplicationService {
     @Transactional
     public void approveLeaveApplication(Long applicationId, Long approverId,
                                         String approvalStatus, String approvalComment) {
-        LeaveApplication application = leaveApplicationRepository.findById(applicationId)
+        leaveApplicationRepository.findById(applicationId)
                 .orElseThrow(() -> new BusinessException(ResultCode.LEAVE_APPLICATION_NOT_FOUND));
 
-        if (!"PENDING".equals(application.getApprovalStatus())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR, "该申请已处理，无法重复审批");
+        ApprovalInstance approvalInstance = approvalService.getApprovalInstance("LEAVE", applicationId);
+        ApprovalTask currentTask = getCurrentTask(approvalInstance, approverId);
+
+        approvalService.processApprovalTask(currentTask.getId(), approverId, approvalStatus, approvalComment);
+
+        LeaveApplication refreshedApplication = leaveApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new BusinessException(ResultCode.LEAVE_APPLICATION_NOT_FOUND));
+
+        if ("APPROVED".equals(refreshedApplication.getApprovalStatus())) {
+            generateLeaveSlip(refreshedApplication);
         }
 
-        // 更新审批任务状态
-        try {
-            ApprovalInstance approvalInstance = approvalService.getApprovalInstance("LEAVE", applicationId);
-            AwardApplicationService.updateTaskStatus(approverId, approvalStatus, approvalComment, approvalInstance, approvalService);
-        } catch (Exception e) {
-            log.error("更新审批任务状态失败", e);
+        if (!"PENDING".equals(refreshedApplication.getApprovalStatus())) {
+            sendApprovalNotification(refreshedApplication, approverId);
+        }
+    }
+
+    private ApprovalTask getCurrentTask(ApprovalInstance approvalInstance, Long approverId) {
+        if (approvalInstance == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "审批流程不存在");
         }
 
-        // 更新请假申请状态
-        application.setApproverId(approverId);
-        application.setApprovalStatus(approvalStatus);
-        application.setApprovalComment(approvalComment);
-        application.setApprovalTime(LocalDateTime.now());
-
-        application = leaveApplicationRepository.save(application);
-
-        // 当审批通过时，自动生成请假条
-        if ("APPROVED".equals(approvalStatus)) {
-            generateLeaveSlip(application);
-        }
-
-        // 发送审批结果通知（多渠道推送）
-        sendApprovalNotification(application, approverId);
+        return approvalService.getCurrentTasks(approvalInstance).stream()
+                .filter(task -> Objects.equals(task.getApproverId(), approverId))
+                .filter(task -> "PROCESSING".equals(task.getStatus()))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "当前没有可处理的审批任务"));
     }
 
     /**
@@ -348,6 +351,37 @@ public class LeaveApplicationService {
 
         Page<LeaveApplication> page = leaveApplicationRepository
                 .findByApplicantIdAndDeletedFalseOrderByCreateTimeDesc(userId, pageable);
+
+        return new PageResult<>(
+                page.getContent(),
+                page.getTotalElements(),
+                pageRequest.getPageNum(),
+                pageRequest.getPageSize()
+        );
+    }
+
+    public PageResult<LeaveApplication> getPendingApplications(Long approverId, PageRequest pageRequest) {
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                pageRequest.getPage(),
+                pageRequest.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "createTime")
+        );
+
+        List<Long> applicationIds = approvalService.getPendingTasks(approverId).stream()
+                .map(task -> task.getInstance().getBusinessId())
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Page<LeaveApplication> page;
+        if (applicationIds.isEmpty()) {
+            page = Page.empty(pageable);
+        } else {
+            page = leaveApplicationRepository.findAll(
+                    (Specification<LeaveApplication>) (root, query, cb) -> root.get("id").in(applicationIds),
+                    pageable
+            );
+        }
 
         return new PageResult<>(
                 page.getContent(),

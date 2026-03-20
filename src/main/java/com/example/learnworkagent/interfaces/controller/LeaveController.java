@@ -69,6 +69,13 @@ public class LeaveController extends BaseController {
         PageResult<LeaveApplication> result = leaveApplicationService.getUserApplications(userId, pageRequest);
         return Result.success(result);
     }
+    @Operation(summary = "分页查询待审批的请假申请（审批人）")
+    @GetMapping("/applications/pending")
+    public Result<PageResult<LeaveApplication>> getPendingApplications(@Valid PageRequest pageRequest) {
+        Long approverId = getCurrentUserId();
+        PageResult<LeaveApplication> result = leaveApplicationService.getPendingApplications(approverId, pageRequest);
+        return Result.success(result);
+    }
 
 
     /**

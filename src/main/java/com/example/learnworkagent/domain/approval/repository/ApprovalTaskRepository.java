@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 审批任务仓库
@@ -32,4 +33,19 @@ public interface ApprovalTaskRepository extends JpaRepository<ApprovalTask, Long
      * 根据审批人ID和状态列表查询任务
      */
     List<ApprovalTask> findByApproverIdAndStatusIn(Long approverId, List<String> statuses);
+
+    /**
+     * 根据审批实例和步骤顺序查询任务
+     */
+    List<ApprovalTask> findByInstanceAndStepStepOrderOrderByTaskOrderAsc(ApprovalInstance instance, Integer stepOrder);
+
+    /**
+     * 根据审批实例和状态列表查询任务
+     */
+    List<ApprovalTask> findByInstanceAndStatusIn(ApprovalInstance instance, List<String> statuses);
+
+    /**
+     * 根据审批实例和步骤顺序查询首个任务
+     */
+    Optional<ApprovalTask> findFirstByInstanceAndStepStepOrderOrderByTaskOrderAsc(ApprovalInstance instance, Integer stepOrder);
 }

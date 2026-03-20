@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 奖助申请服务
@@ -239,43 +241,33 @@ public class AwardApplicationService {
         AwardApplication application = awardApplicationRepository.findById(applicationId)
                 .orElseThrow(() -> new BusinessException(ResultCode.AWARD_APPLICATION_NOT_FOUND));
 
-        if (!"PENDING".equals(application.getApprovalStatus())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR, "该申请已处理，无法重复审批");
-        }
-
         if (!"PASSED".equals(application.getMaterialStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "材料预审未通过，无法审批");
         }
 
-        application.setApproverId(approverId);
-        application.setApprovalStatus(approvalStatus);
-        application.setApprovalComment(approvalComment);
-        application.setApprovalTime(LocalDateTime.now());
+        ApprovalInstance approvalInstance = approvalService.getApprovalInstance("AWARD", applicationId);
+        ApprovalTask currentTask = getCurrentTask(approvalInstance, approverId);
 
-        awardApplicationRepository.save(application);
+        approvalService.processApprovalTask(currentTask.getId(), approverId, approvalStatus, approvalComment);
 
-        // 更新审批任务状态
-        try {
-            ApprovalInstance approvalInstance = approvalService.getApprovalInstance("AWARD", applicationId);
-            updateTaskStatus(approverId, approvalStatus, approvalComment, approvalInstance, approvalService);
-        } catch (Exception e) {
-            log.error("更新审批任务状态失败", e);
+        AwardApplication refreshedApplication = awardApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new BusinessException(ResultCode.AWARD_APPLICATION_NOT_FOUND));
+
+        if (!"PENDING".equals(refreshedApplication.getApprovalStatus())) {
+            sendApprovalNotification(refreshedApplication, approverId);
         }
-
-        // 发送审批结果通知（多渠道推送）
-        sendApprovalNotification(application, approverId);
     }
 
-    public static void updateTaskStatus(Long approverId, String approvalStatus, String approvalComment, ApprovalInstance approvalInstance, ApprovalService approvalService) {
-        if (approvalInstance != null) {
-            List<ApprovalTask> tasks = approvalService.getPendingTasks(approverId);
-            for (ApprovalTask task : tasks) {
-                if (task.getInstance().getId().equals(approvalInstance.getId())) {
-                    approvalService.processApprovalTask(task.getId(), approverId, approvalStatus, approvalComment);
-                    break;
-                }
-            }
+    private ApprovalTask getCurrentTask(ApprovalInstance approvalInstance, Long approverId) {
+        if (approvalInstance == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "审批流程不存在");
         }
+
+        return approvalService.getCurrentTasks(approvalInstance).stream()
+                .filter(task -> Objects.equals(task.getApproverId(), approverId))
+                .filter(task -> "PROCESSING".equals(task.getStatus()))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "当前没有可处理的审批任务"));
     }
 
     /**
@@ -394,9 +386,21 @@ public class AwardApplicationService {
                 Sort.by(Sort.Direction.DESC, "createTime")
         );
 
-        //根据审批状态和审批人进行分页查询
-        Page<AwardApplication> page = awardApplicationRepository
-                .findByApprovalStatusAndApproverIdAndDeletedFalseOrderByCreateTimeDesc("PENDING", approverId, pageable);
+        List<Long> applicationIds = approvalService.getPendingTasks(approverId).stream()
+                .map(task -> task.getInstance().getBusinessId())
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Page<AwardApplication> page;
+        if (applicationIds.isEmpty()) {
+            page = Page.empty(pageable);
+        } else {
+            page = awardApplicationRepository.findAll(
+                    (Specification<AwardApplication>) (root, query, cb) -> root.get("id").in(applicationIds),
+                    pageable
+            );
+        }
 
         return new PageResult<>(
                 page.getContent(),
