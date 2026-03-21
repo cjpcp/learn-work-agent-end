@@ -32,4 +32,9 @@ public class ConsultationRequest {
      * 语音URL（如果是语音类型问题）
      */
     private String voiceUrl;
+
+    /**
+     * 会话ID（标识同一次连续对话，前端生成并维护）
+     */
+    private String sessionId;
 }

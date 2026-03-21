@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 咨询问题仓库
@@ -30,6 +31,18 @@ public interface ConsultationQuestionRepository extends JpaRepository<Consultati
      * 根据分类查询
      */
     Page<ConsultationQuestion> findByCategoryAndDeletedFalseOrderByCreateTimeDesc(String category, Pageable pageable);
+
+    /**
+     * 根据会话ID查询该会话所有问题，按时间升序
+     */
+    @Query("SELECT cq FROM ConsultationQuestion cq WHERE cq.sessionId = :sessionId AND cq.deleted = false ORDER BY cq.createTime ASC")
+    List<ConsultationQuestion> findBySessionIdOrderByCreateTimeAsc(@Param("sessionId") String sessionId);
+
+    /**
+     * 根据用户ID查询指定问题ID之前（含）的历史问题，按时间升序（兜底查询，sessionId为空时使用）
+     */
+    @Query("SELECT cq FROM ConsultationQuestion cq WHERE cq.userId = :userId AND cq.id <= :questionId AND cq.deleted = false ORDER BY cq.createTime ASC")
+    List<ConsultationQuestion> findHistoryByUserIdUpToQuestion(@Param("userId") Long userId, @Param("questionId") Long questionId);
 
     /**
      * 查询需要转人工的问题

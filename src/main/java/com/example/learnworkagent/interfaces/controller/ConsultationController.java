@@ -53,7 +53,6 @@ public class ConsultationController extends BaseController {
     @Operation(summary = "提交咨询问题")
     @PostMapping("/questions")
     public Result<ConsultationQuestion> submitQuestion(@Valid @RequestBody ConsultationRequest request) {
-        // TODO: 从JWT中获取用户ID
         Long userId = getCurrentUserId();
         ConsultationQuestion question = consultationService.submitQuestion(
                 userId,
@@ -61,7 +60,8 @@ public class ConsultationController extends BaseController {
                 request.getQuestionType(),
                 request.getCategory(),
                 request.getImageUrl(),
-                request.getVoiceUrl()
+                request.getVoiceUrl(),
+                request.getSessionId()
         );
         return Result.success(question);
     }
@@ -190,7 +190,8 @@ public class ConsultationController extends BaseController {
                 request.getQuestionType(),
                 request.getCategory(),
                 request.getImageUrl(),
-                request.getVoiceUrl()
+                request.getVoiceUrl(),
+                request.getSessionId()
         );
 
         log.info("准备订阅Flux，userId: {}", userId);
@@ -334,24 +335,25 @@ public class ConsultationController extends BaseController {
     }
 
     /**
-     * 获取转人工记录详情
+     * 获取转人工记录详情（含历史咨询记录）
      *
      * @param id 转人工记录id
-     * @return 转人工记录详情
+     * @return 转人工记录详情 + 历史咨询问题列表
      */
     @Operation(summary = "获取转人工记录详情")
     @GetMapping("/transfers/{id}")
-    public Result<HumanTransfer> getTransferDetail(@PathVariable Long id) {
-        Long userId = getCurrentUserId();
+    public Result<Map<String, Object>> getTransferDetail(@PathVariable Long id) {
         HumanTransfer transfer = humanTransferRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "转人工记录不存在"));
 
-        // 验证权限，只能查看自己的转人工记录
-        if (!transfer.getStaffId().equals(userId)) {
-            throw new BusinessException(ResultCode.FORBIDDEN, "无权查看此转人工记录");
-        }
+        // 查询该用户在此问题之前（含）的所有历史咨询记录作为上下文
+        List<ConsultationQuestion> history = consultationService.getHistoryByUserIdUpToQuestion(
+                transfer.getUserId(), transfer.getQuestionId());
 
-        return Result.success(transfer);
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("transfer", transfer);
+        result.put("history", history);
+        return Result.success(result);
     }
 
     /**

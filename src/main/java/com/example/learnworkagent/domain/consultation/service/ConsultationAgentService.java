@@ -3,7 +3,9 @@ package com.example.learnworkagent.domain.consultation.service;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
+import com.example.learnworkagent.domain.consultation.entity.HumanTransfer;
 import com.example.learnworkagent.domain.consultation.repository.ConsultationQuestionRepository;
+import com.example.learnworkagent.domain.consultation.repository.HumanTransferRepository;
 import com.example.learnworkagent.infrastructure.external.dify.DifyChatService;
 import com.example.learnworkagent.infrastructure.service.CacheService;
 import jakarta.annotation.Resource;
@@ -17,7 +19,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 咨询Agent服务（用于高频问题解答和多模态交互）
@@ -30,6 +33,7 @@ public class ConsultationAgentService {
     private final ConsultationQuestionRepository consultationQuestionRepository;
     private final DifyChatService difyChatService;
     private final CacheService cacheService;
+    private final HumanTransferRepository humanTransferRepository;
 
     // 注入自身的代理对象，用于解决事务自调用问题
     @Resource
@@ -51,7 +55,6 @@ public class ConsultationAgentService {
             // 检查是否需要转人工，如需要转人工，则将问题状态设置为转人工
             if (shouldTransferToHuman(question)) {
                 self.transferToHuman(question);
-                CompletableFuture.completedFuture(null);
                 return;
             }
 
@@ -59,7 +62,6 @@ public class ConsultationAgentService {
             String cachedAnswer = getCachedAnswer(question);
             if (cachedAnswer != null) {
                 self.updateQuestionAnswer(question, cachedAnswer, "AI");
-                CompletableFuture.completedFuture(null);
                 return;
             }
 
@@ -67,7 +69,7 @@ public class ConsultationAgentService {
             String prompt = buildPrompt(question);
             if ("IMAGE".equals(question.getQuestionType()) && question.getImageUrl() != null) {
                 // 处理图片类型问题
-                difyChatService.chatStream(prompt, java.util.List.of(question.getImageUrl()), null, String.valueOf(question.getUserId()))
+                difyChatService.chatStream(prompt, List.of(question.getImageUrl()), null, String.valueOf(question.getUserId()))
                         .collectList()
                         .subscribe(
                                 answerList -> {
@@ -103,10 +105,8 @@ public class ConsultationAgentService {
                         );
             }
 
-            CompletableFuture.completedFuture(null);
         } catch (Exception e) {
             log.error("处理问题失败，问题ID: {}", questionId, e);
-            CompletableFuture.completedFuture(null);
         }
     }
 
@@ -126,7 +126,7 @@ public class ConsultationAgentService {
     }
 
     /**
-     * 转人工
+     * 转人工（同时创建 HumanTransfer 记录）
      */
     @Transactional
     public void transferToHuman(ConsultationQuestion question) {
@@ -135,7 +135,17 @@ public class ConsultationAgentService {
         question.setTransferReason("问题复杂或包含敏感关键词，需要人工处理");
         question.setAnswerSource("HUMAN");
         consultationQuestionRepository.save(question);
-        log.info("问题已转人工，问题ID: {}", question.getId());
+
+        // 创建转人工记录（之前缺失此步骤）
+        HumanTransfer transfer = new HumanTransfer();
+        transfer.setQuestionId(question.getId());
+        transfer.setUserId(question.getUserId());
+        transfer.setTransferType("AUTO");
+        transfer.setTransferReason("问题复杂或包含敏感关键词，需要人工处理");
+        transfer.setStatus("PENDING");
+        humanTransferRepository.save(transfer);
+
+        log.info("问题已转人工，问题ID: {}, HumanTransfer已创建", question.getId());
     }
 
     /**
@@ -163,7 +173,7 @@ public class ConsultationAgentService {
      */
     private void cacheAnswer(ConsultationQuestion question, String answer) {
         String cacheKey = "consultation:answer:" + question.getQuestionText().hashCode();
-        cacheService.set(cacheKey, answer, 30, java.util.concurrent.TimeUnit.MINUTES);
+        cacheService.set(cacheKey, answer, 30, TimeUnit.MINUTES);
     }
 
     /**
@@ -226,7 +236,7 @@ public class ConsultationAgentService {
                     
                     if ("IMAGE".equals(question.getQuestionType()) && question.getImageUrl() != null) {
                         // 处理图片类型问题
-                        return difyChatService.chatStream(prompt, java.util.List.of(question.getImageUrl()), null, String.valueOf(question.getUserId()))
+                        return difyChatService.chatStream(prompt, List.of(question.getImageUrl()), null, String.valueOf(question.getUserId()))
                                 //所有数据发送完成时的回调函数
                                 .doOnComplete(() -> {
                                     log.info("Dify多模态API调用完成，问题ID: {}", questionId);

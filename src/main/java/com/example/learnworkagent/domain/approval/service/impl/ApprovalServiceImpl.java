@@ -74,7 +74,7 @@ public class ApprovalServiceImpl implements ApprovalService {
         ApprovalProcess process = processOptional.get();
         List<ApprovalStep> steps = stepRepository.findByProcessOrderByStepOrderAsc(process);
         if (steps.isEmpty()) {
-            throw new RuntimeException("审批流程未配置审批步骤: " + businessType);
+            throw new RuntimeException("审批流程未配置审批步骤 " + businessType);
         }
 
         ApprovalInstance instance = new ApprovalInstance();
@@ -98,7 +98,7 @@ public class ApprovalServiceImpl implements ApprovalService {
     @Transactional
     public ApprovalTask processApprovalTask(Long taskId, Long approverId, String status, String comment) {
         ApprovalTask task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("审批任务不存在: " + taskId));
+                .orElseThrow(() -> new RuntimeException("审批任务不存在 " + taskId));
 
         if (!TASK_PROCESSING.equals(task.getStatus())) {
             throw new RuntimeException("当前任务未到审批阶段或已处理");
@@ -109,7 +109,7 @@ public class ApprovalServiceImpl implements ApprovalService {
         }
 
         if (!TASK_APPROVED.equals(status) && !TASK_REJECTED.equals(status)) {
-            throw new RuntimeException("无效的审批状态: " + status);
+            throw new RuntimeException("无效的审批状态 " + status);
         }
 
         task.setStatus(status);
@@ -214,7 +214,7 @@ public class ApprovalServiceImpl implements ApprovalService {
     private void handleStepProgress(ApprovalInstance instance, Integer stepOrder, String taskStatus) {
         List<ApprovalTask> stepTasks = taskRepository.findByInstanceAndStepStepOrderOrderByTaskOrderAsc(instance, stepOrder);
         if (stepTasks.isEmpty()) {
-            throw new RuntimeException("审批步骤任务不存在: stepOrder=" + stepOrder);
+            throw new RuntimeException("审批步骤任务不存在 stepOrder=" + stepOrder);
         }
 
         ApprovalStep step = stepTasks.get(0).getStep();

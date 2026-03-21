@@ -150,13 +150,12 @@ public class HumanTransferService {
 
         // 只查询未完成的记录（PENDING或PROCESSING状态）
         Page<HumanTransfer> page = humanTransferRepository
-                .findByStaffIdAndStatusInAndDeletedFalseOrderByCreateTimeDesc(
-                        staffId, 
+                .findByStatusInAndDeletedFalseOrderByCreateTimeDesc(
                         java.util.Arrays.asList("PENDING", "PROCESSING"), 
                         pageable
                 );
 
-        return new PageResult<HumanTransfer>(
+        return new PageResult<>(
                 page.getContent(),
                 page.getTotalElements(),
                 pageRequest.getPageNum(),
@@ -182,7 +181,7 @@ public class HumanTransferService {
                         pageable
                 );
 
-        return new PageResult<HumanTransfer>(
+        return new PageResult<>(
                 page.getContent(),
                 page.getTotalElements(),
                 pageRequest.getPageNum(),

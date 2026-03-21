@@ -6,6 +6,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 /**
  * 人工转接仓库
  */
@@ -30,7 +32,7 @@ public interface HumanTransferRepository extends JpaRepository<HumanTransfer, Lo
     /**
      * 根据状态分页查询
      */
-    Page<HumanTransfer> findByStatusAndDeletedFalseOrderByCreateTimeDesc(String status, Pageable pageable);
+    Page<HumanTransfer> findByStatusInAndDeletedFalseOrderByCreateTimeDesc(List<String> status, Pageable pageable);
 
     /**
      * 根据问题ID查询

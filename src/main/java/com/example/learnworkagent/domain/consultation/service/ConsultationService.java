@@ -14,6 +14,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
+import java.util.List;
 
 /**
  * 咨询服务
@@ -31,7 +32,7 @@ public class ConsultationService {
      */
     @Transactional
     public ConsultationQuestion submitQuestion(Long userId, String questionText, String questionType,
-                                               String category, String imageUrl, String voiceUrl) {
+                                               String category, String imageUrl, String voiceUrl, String sessionId) {
         ConsultationQuestion question = new ConsultationQuestion();
         question.setUserId(userId);
         question.setQuestionText(questionText);
@@ -39,6 +40,7 @@ public class ConsultationService {
         question.setCategory(category);
         question.setImageUrl(imageUrl);
         question.setVoiceUrl(voiceUrl);
+        question.setSessionId(sessionId);
         question.setStatus("PENDING");
 
         ConsultationQuestion saved = consultationQuestionRepository.save(question);
@@ -106,6 +108,18 @@ public class ConsultationService {
     }
 
     /**
+     * 查询用户在指定问题之前（含）的历史咨询记录
+     */
+    public List<ConsultationQuestion> getHistoryByUserIdUpToQuestion(Long userId, Long questionId) {
+        // 优先按 sessionId 查询同一会话，兼容无 sessionId 的老数据
+        ConsultationQuestion question = consultationQuestionRepository.findById(questionId).orElse(null);
+        if (question != null && question.getSessionId() != null && !question.getSessionId().isBlank()) {
+            return consultationQuestionRepository.findBySessionIdOrderByCreateTimeAsc(question.getSessionId());
+        }
+        return consultationQuestionRepository.findHistoryByUserIdUpToQuestion(userId, questionId);
+    }
+
+    /**
      * 评价问题回答
      */
     @Transactional
@@ -119,7 +133,7 @@ public class ConsultationService {
      * 提交咨询问题（流式响应）
      */
     public Flux<String> submitQuestionStream(Long userId, String questionText, String questionType,
-                                             String category, String imageUrl, String voiceUrl) {
+                                             String category, String imageUrl, String voiceUrl, String sessionId) {
         //保存问题
         ConsultationQuestion question = new ConsultationQuestion();
         question.setUserId(userId);
@@ -128,6 +142,7 @@ public class ConsultationService {
         question.setCategory(category);
         question.setImageUrl(imageUrl);
         question.setVoiceUrl(voiceUrl);
+        question.setSessionId(sessionId);
         question.setStatus("PENDING");
 
         ConsultationQuestion saved = consultationQuestionRepository.save(question);
