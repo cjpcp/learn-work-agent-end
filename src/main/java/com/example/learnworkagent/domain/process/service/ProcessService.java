@@ -39,9 +39,9 @@ public class ProcessService {
             // 分页获取学生待处理的请假申请
             var pendingLeaveApps = leaveApplicationRepository.findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(user.getId(), "PENDING", PageRequest.of(0, 100));
 
+            //批量封装待审批请假
             for (LeaveApplication app : pendingLeaveApps.getContent()) {
                 ProcessItem item = new ProcessItem();
-                //todo 可能并不需要展示id
                 item.setId(app.getId().toString());
                 item.setName("请假申请");
                 item.setType("leave");
@@ -54,6 +54,7 @@ public class ProcessService {
             // 分页获取学生待处理的奖助申请
             var pendingAwardApps = awardApplicationRepository.findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(user.getId(), "PENDING", PageRequest.of(0, 100));
 
+            //批量封装待审批奖助
             for (AwardApplication app : pendingAwardApps.getContent()) {
                 ProcessItem item = new ProcessItem();
                 item.setId(app.getId().toString());
@@ -82,10 +83,19 @@ public class ProcessService {
         return response;
     }
 
+
+    /**
+     * 学生工作人员获取待办任务
+     *
+     * @param user    用户信息
+     * @param pending 待办任务列表
+     */
     private void getPendingTasks(User user, List<ProcessItem> pending) {
-        List<ApprovalTask> pendingTasks =new ArrayList<>();
-//        pendingTasks.addAll(approvalTaskRepository.findByApproverIdAndStatus(user.getId(), "PENDING"));
-        pendingTasks.addAll(approvalTaskRepository.findByApproverIdAndStatus(user.getId(), "PROCESSING"));
+
+        // 获取待处理的审批任务
+        List<ApprovalTask> pendingTasks = new ArrayList<>(approvalTaskRepository.findByApproverIdAndStatus(user.getId(), "PROCESSING"));
+
+        //批量封装待审批任务
         for (ApprovalTask task : pendingTasks) {
             ProcessItem item = new ProcessItem();
             item.setId(task.getInstance().getBusinessId().toString());
@@ -98,6 +108,14 @@ public class ProcessService {
         }
     }
 
+
+    /**
+     * 获取流程详情
+     *
+     * @param id   流程id
+     * @param type 流程类型（请假或奖助）
+     * @return 流程详情
+     */
     public ProcessItem getProcessDetail(String id, String type) {
         ProcessItem item = new ProcessItem();
         // 根据类型和ID获取详细信息
@@ -118,7 +136,7 @@ public class ProcessService {
                 item.setName("奖助学金审批");
                 item.setType("award");
                 item.setCreateTime(app.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                item.setStatus(app.getApprovalStatus().equals("PENDING") ? "pending" : "completed");
+                item.setStatus(app.getApprovalStatus());
                 item.setDescription("用户的奖助学金申请");
             }
         }
@@ -184,7 +202,7 @@ public class ProcessService {
         } else if ("COLLEGE_LEADER".equals(user.getRole())) {
             getCompletedTasks(user, completed);
 
-        } else if("DEPARTMENT_LEADER".equals(user.getRole())) {
+        } else if ("DEPARTMENT_LEADER".equals(user.getRole())) {
             getCompletedTasks(user, completed);
         }
 

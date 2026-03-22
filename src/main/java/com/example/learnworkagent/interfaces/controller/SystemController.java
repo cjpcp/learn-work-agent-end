@@ -34,6 +34,8 @@ public class SystemController extends BaseController {
 
     /**
      * 获取学工角色列表
+     *
+     * @return 学工角色列表
      */
     @Operation(summary = "获取学工角色列表")
     @GetMapping("/roles/staff")
@@ -49,6 +51,8 @@ public class SystemController extends BaseController {
 
     /**
      * 获取所有角色列表
+     *
+     * @return 角色列表
      */
     @Operation(summary = "获取所有角色列表")
     @GetMapping("/roles")
@@ -64,6 +68,8 @@ public class SystemController extends BaseController {
 
     /**
      * 获取启用的部门列表
+     *
+     * @return 部门列表
      */
     @Operation(summary = "获取启用的部门列表")
     @GetMapping("/departments")
@@ -74,6 +80,8 @@ public class SystemController extends BaseController {
 
     /**
      * 获取启用的学院列表
+     *
+     * @return 学院列表
      */
     @Operation(summary = "获取启用的学院列表")
     @GetMapping("/colleges")
@@ -82,6 +90,13 @@ public class SystemController extends BaseController {
         return getListResult(colleges);
     }
 
+
+    /**
+     * 将部门列表转换为接口返回格式
+     *
+     * @param colleges 启用的学院列表
+     * @return 接口返回结果
+     */
     private Result<List<Map<String, Object>>> getListResult(List<Department> colleges) {
         List<Map<String, Object>> result = colleges.stream()
                 .map(college -> Map.<String, Object>of(
@@ -95,11 +110,14 @@ public class SystemController extends BaseController {
     }
 
     /**
-     * 获取用户列表
+     * 根据部门ID查询该部门领导
+     *
+     * @param departmentId 部门ID
+     * @return 用户列表
      */
-    @Operation(summary = "获取用户列表")
+    @Operation(summary = "根据部门ID查询该部门领导")
     @GetMapping("/users")
-    public Result<List<Map<String, Object>>> getUsers(
+    public Result<List<Map<String, Object>>> getDepartmentLeader(
             @org.springframework.web.bind.annotation.RequestParam(required = false) Long departmentId) {
         List<User> users;
         if (departmentId != null) {

@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * 流程控制器
+ * 提供流程相关的接口
+ */
 @RestController
 @RequestMapping("/api/v1/process")
 @RequiredArgsConstructor
@@ -22,6 +26,12 @@ public class ProcessController extends BaseController {
 
     private final ProcessService processService;
 
+    /**
+     * 根据用户获取流程列表
+     *
+     * @param user 用户信息
+     * @return 未完成流程和已完成流程
+     */
     @GetMapping("/list")
     public Result<ProcessListResponse> getProcessList(@AuthenticationPrincipal User user) {
         ProcessListResponse response = processService.getProcessList(user);
