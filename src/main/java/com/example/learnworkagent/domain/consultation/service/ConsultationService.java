@@ -4,8 +4,11 @@ import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
+import com.example.learnworkagent.domain.consultation.dto.ConsultationRequest;
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
 import com.example.learnworkagent.domain.consultation.repository.ConsultationQuestionRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -26,13 +29,15 @@ public class ConsultationService {
 
     private final ConsultationQuestionRepository consultationQuestionRepository;
     private final ConsultationAgentService consultationAgentService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * 提交咨询问题
      */
     @Transactional
     public ConsultationQuestion submitQuestion(Long userId, String questionText, String questionType,
-                                               String category, String imageUrl, String voiceUrl, String sessionId) {
+                                               String category, String imageUrl, String voiceUrl, String sessionId,
+                                               List<ConsultationRequest.FileInput> files) {
         ConsultationQuestion question = new ConsultationQuestion();
         question.setUserId(userId);
         question.setQuestionText(questionText);
@@ -42,6 +47,7 @@ public class ConsultationService {
         question.setVoiceUrl(voiceUrl);
         question.setSessionId(sessionId);
         question.setStatus("PENDING");
+        question.setFileUrls(serializeFileUrls(files));
 
         ConsultationQuestion saved = consultationQuestionRepository.save(question);
 
@@ -133,7 +139,8 @@ public class ConsultationService {
      * 提交咨询问题（流式响应）
      */
     public Flux<String> submitQuestionStream(Long userId, String questionText, String questionType,
-                                             String category, String imageUrl, String voiceUrl, String sessionId) {
+                                             String category, String imageUrl, String voiceUrl, String sessionId,
+                                             List<ConsultationRequest.FileInput> files) {
         //保存问题
         ConsultationQuestion question = new ConsultationQuestion();
         question.setUserId(userId);
@@ -144,11 +151,29 @@ public class ConsultationService {
         question.setVoiceUrl(voiceUrl);
         question.setSessionId(sessionId);
         question.setStatus("PENDING");
+        question.setFileUrls(serializeFileUrls(files));
 
         ConsultationQuestion saved = consultationQuestionRepository.save(question);
 
         Flux<String> res = consultationAgentService.processQuestionStream(saved.getId());
         log.info("res1:{}", res);
         return res;
+    }
+
+    /**
+     * 将文件列表的 URL 序列化为 JSON 字符串保存到数据库
+     */
+    private String serializeFileUrls(List<ConsultationRequest.FileInput> files) {
+        if (files == null || files.isEmpty()) return null;
+        try {
+            List<String> urls = files.stream()
+                    .map(ConsultationRequest.FileInput::getUrl)
+                    .filter(url -> url != null && !url.isBlank())
+                    .toList();
+            return urls.isEmpty() ? null : objectMapper.writeValueAsString(urls);
+        } catch (JsonProcessingException e) {
+            log.warn("序列化文件URL失败", e);
+            return null;
+        }
     }
 }

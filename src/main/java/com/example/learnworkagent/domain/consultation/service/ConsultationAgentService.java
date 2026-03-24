@@ -8,6 +8,8 @@ import com.example.learnworkagent.domain.consultation.repository.ConsultationQue
 import com.example.learnworkagent.domain.consultation.repository.HumanTransferRepository;
 import com.example.learnworkagent.infrastructure.external.dify.DifyChatService;
 import com.example.learnworkagent.infrastructure.service.CacheService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +21,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -34,11 +37,37 @@ public class ConsultationAgentService {
     private final DifyChatService difyChatService;
     private final CacheService cacheService;
     private final HumanTransferRepository humanTransferRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // 注入自身的代理对象，用于解决事务自调用问题
     @Resource
     @Lazy
     private ConsultationAgentService self;
+
+    /**
+     * 从实体的 fileUrls JSON 字段中解析出 URL 列表，合并 imageUrl/voiceUrl
+     */
+    private List<String> resolveFileUrls(ConsultationQuestion question) {
+        List<String> urls = new ArrayList<>();
+        // 先加 imageUrl / voiceUrl（兼容旧字段）
+        if (question.getImageUrl() != null && !question.getImageUrl().isBlank()) {
+            urls.add(question.getImageUrl());
+        }
+        if (question.getVoiceUrl() != null && !question.getVoiceUrl().isBlank()) {
+            urls.add(question.getVoiceUrl());
+        }
+        // 再加附件文件 URL
+        String fileUrlsJson = question.getFileUrls();
+        if (fileUrlsJson != null && !fileUrlsJson.isBlank()) {
+            try {
+                List<String> parsed = objectMapper.readValue(fileUrlsJson, new TypeReference<List<String>>() {});
+                if (parsed != null) urls.addAll(parsed);
+            } catch (Exception e) {
+                log.warn("解析 fileUrls JSON 失败，questionId: {}, json: {}", question.getId(), fileUrlsJson, e);
+            }
+        }
+        return urls.isEmpty() ? null : urls;
+    }
 
     /**
      * 异步处理问题
@@ -67,43 +96,23 @@ public class ConsultationAgentService {
 
             // 根据问题类型调用相应的AI服务
             String prompt = buildPrompt(question);
-            if ("IMAGE".equals(question.getQuestionType()) && question.getImageUrl() != null) {
-                // 处理图片类型问题
-                difyChatService.chatStream(prompt, List.of(question.getImageUrl()), null, String.valueOf(question.getUserId()))
-                        .collectList()
-                        .subscribe(
-                                answerList -> {
-                                    String answer = String.join("", answerList);
-                                    // 缓存答案
-                                    cacheAnswer(question, answer);
-                                    // 更新问题答案
-                                    self.updateQuestionAnswer(question, answer, "AI");
-                                },
-                                error -> {
-                                    log.error("AI服务调用失败，问题ID: {}", questionId, error);
-                                    // AI服务失败，转人工
-                                    self.transferToHuman(question);
-                                }
-                        );
-            } else {
-                // 处理文本或语音类型问题
-                difyChatService.chatStream(prompt, null, null, String.valueOf(question.getUserId()))
-                        .collectList()
-                        .subscribe(
-                                answerList -> {
-                                    String answer = String.join("", answerList);
-                                    // 缓存答案
-                                    cacheAnswer(question, answer);
-                                    // 更新问题答案
-                                    self.updateQuestionAnswer(question, answer, "AI");
-                                },
-                                error -> {
-                                    log.error("AI服务调用失败，问题ID: {}", questionId, error);
-                                    // AI服务失败，转人工
-                                    self.transferToHuman(question);
-                                }
-                        );
-            }
+            List<String> fileUrls = resolveFileUrls(question);
+            difyChatService.chatStream(prompt, fileUrls, null, String.valueOf(question.getUserId()))
+                    .collectList()
+                    .subscribe(
+                            answerList -> {
+                                String answer = String.join("", answerList);
+                                // 缓存答案
+                                cacheAnswer(question, answer);
+                                // 更新问题答案
+                                self.updateQuestionAnswer(question, answer, "AI");
+                            },
+                            error -> {
+                                log.error("AI服务调用失败，问题ID: {}", questionId, error);
+                                // AI服务失败，转人工
+                                self.transferToHuman(question);
+                            }
+                    );
 
         } catch (Exception e) {
             log.error("处理问题失败，问题ID: {}", questionId, e);

@@ -106,4 +106,11 @@ public class ConsultationQuestion extends BaseEntity {
     @Comment("会话ID")
     @Column(name = "session_id", length = 64)
     private String sessionId;
+
+    /**
+     * 附件文件URL列表（JSON数组，存储已上传至OSS的文件URL）
+     */
+    @Comment("附件文件URL列表(JSON)")
+    @Column(name = "file_urls", columnDefinition = "TEXT")
+    private String fileUrls;
 }

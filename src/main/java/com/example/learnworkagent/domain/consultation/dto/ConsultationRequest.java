@@ -3,6 +3,8 @@ package com.example.learnworkagent.domain.consultation.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * 咨询请求DTO
  */
@@ -37,4 +39,16 @@ public class ConsultationRequest {
      * 会话ID（标识同一次连续对话，前端生成并维护）
      */
     private String sessionId;
+
+    /**
+     * 附件文件列表（已上传至OSS，携带URL供AI使用）
+     */
+    private List<FileInput> files;
+
+    @Data
+    public static class FileInput {
+        private String transferMethod;
+        private String url;
+        private String type;
+    }
 }

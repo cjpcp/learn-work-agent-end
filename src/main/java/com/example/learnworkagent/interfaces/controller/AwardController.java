@@ -7,17 +7,12 @@ import com.example.learnworkagent.domain.award.dto.AwardApplicationRequest;
 import com.example.learnworkagent.domain.award.entity.AwardApplication;
 import com.example.learnworkagent.domain.award.service.AwardApplicationService;
 import com.example.learnworkagent.domain.leave.dto.ApprovalRequest;
-import com.example.learnworkagent.infrastructure.external.oss.OssService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 奖助管理控制器
@@ -30,7 +25,6 @@ import java.util.List;
 public class AwardController extends BaseController {
 
     private final AwardApplicationService awardApplicationService;
-    private final OssService ossService;
 
     /**
      * 提交奖助申请
@@ -103,25 +97,5 @@ public class AwardController extends BaseController {
         return Result.success();
     }
 
-    /**
-     * 上传奖助申请附件（支持单个或多个文件）
-     *
-     * @param files 上传的文件列表
-     * @return 文件URL列表
-     */
-    @Operation(summary = "上传奖助申请附件", description = "支持单个或多个文件上传")
-    @PostMapping("/applications/upload")
-    public Result<List<String>> uploadAttachments(@RequestParam("files") MultipartFile[] files) {
-        Long userId = getCurrentUserId();
-        List<String> fileUrls = new ArrayList<>();
 
-        for (MultipartFile file : files) {
-            if (!file.isEmpty()) {
-                String fileUrl = ossService.uploadAwardFile(file, userId);
-                fileUrls.add(fileUrl);
-            }
-        }
-
-        return Result.success("文件上传成功", fileUrls);
-    }
 } 
