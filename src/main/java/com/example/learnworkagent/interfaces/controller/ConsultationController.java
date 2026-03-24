@@ -210,28 +210,83 @@ public class ConsultationController extends BaseController {
         return Result.success(fileUrl);
     }
 
-    @Operation(summary = "Dify智能咋询（流式响应）")
-    @PostMapping(value = "/dify/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter difyChat(@Valid @RequestBody DifyConsultationRequest request) {
-        final Long userId = getCurrentUserId();
-        final String user = userId != null ? String.valueOf(userId) : "anonymous";
+    /**
+     * 提交咋询问题（流式响应＋附件同步上传）
+     */
+    @Operation(summary = "提交咋询问题（流式响应+附件同步上传）")
+    @PostMapping(value = "/questions/stream/multipart", produces = MediaType.TEXT_EVENT_STREAM_VALUE,
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public SseEmitter submitQuestionStreamWithFiles(
+            @RequestParam("questionText") String questionText,
+            @RequestParam(value = "sessionId", required = false) String sessionId,
+            @RequestParam(value = "files", required = false) MultipartFile[] files) {
 
-        log.info("收到Dify咋询请求，user: {}, query: {}", user, request.getQuery());
+        final Long userId = getCurrentUserId();
+        if (userId == null) {
+            SseEmitter errorEmitter = new SseEmitter();
+            try {
+                errorEmitter.send(SseEmitter.event().data("错误: 用户未登录"));
+                errorEmitter.complete();
+            } catch (IOException e) { errorEmitter.completeWithError(e); }
+            return errorEmitter;
+        }
+
+        log.info("收到multipart流式请求, userId: {}, questionText: {}, 文件数: {}",
+                userId, questionText, files != null ? files.length : 0);
+
+        // 先将附件上传到OSS，收集URL
+        List<String> fileUrls = new java.util.ArrayList<>();
+        if (files != null) {
+            for (MultipartFile file : files) {
+                if (file != null && !file.isEmpty()) {
+                    try {
+                        String ct = file.getContentType() != null ? file.getContentType() : "";
+                        String fileType = ct.startsWith("audio/") ? "voice" : ct.startsWith("image/") ? "image" : "file";
+                        String url = ossService.uploadConsultationFile(file, userId, fileType);
+                        fileUrls.add(url);
+                        log.info("附件上传成功: {}", url);
+                    } catch (Exception e) {
+                        log.error("附件上传失败: {}", file.getOriginalFilename(), e);
+                    }
+                }
+            }
+        }
+
+        List<com.example.learnworkagent.domain.consultation.dto.ConsultationRequest.FileInput> fileInputs =
+                fileUrls.stream().map(url -> {
+                    com.example.learnworkagent.domain.consultation.dto.ConsultationRequest.FileInput fi =
+                            new com.example.learnworkagent.domain.consultation.dto.ConsultationRequest.FileInput();
+                    fi.setUrl(url);
+                    fi.setTransferMethod("remote_url");
+                    String lower = url.toLowerCase();
+                    fi.setType(lower.matches(".*\\.(jpg|jpeg|png|gif|webp|bmp)$") ? "image"
+                            : lower.matches(".*\\.(mp3|wav|ogg|m4a|webm|aac)$") ? "audio" : "document");
+                    return fi;
+                }).toList();
 
         SseEmitter emitter = new SseEmitter(120000L);
-        emitter.onCompletion(() -> log.info("Dify SSE完成，user: {}", user));
-        emitter.onError((e) -> log.error("Dify SSE错误，user: {}", user, e));
+        emitter.onCompletion(() -> log.info("multipart SSE 完成, userId: {}", userId));
+        emitter.onError(e -> log.error("multipart SSE 错误, userId: {}", userId, e));
         emitter.onTimeout(() -> {
-            try { emitter.send(SseEmitter.event().data("错误: 超时")); } catch (IOException ex) { log.error("", ex); }
+            try { emitter.send(SseEmitter.event().data("错误: 请求超时")); } catch (IOException e) { log.error("", e); }
             emitter.complete();
         });
 
-        List<String> fileUrls = difyChatService.extractFileUrls(request.getFiles());
-        Flux<String> responseFlux = difyChatService.chatStream(request.getQuery(), fileUrls, request.getConversationId(), user);
+        reactor.core.publisher.Flux<String> responseFlux = consultationService.submitQuestionStream(
+                userId, questionText, "TEXT", null, null, null, sessionId, fileInputs);
 
-        responseFlux.publishOn(Schedulers.boundedElastic()).subscribe(
-                chunk -> { try { emitter.send(SseEmitter.event().data(chunk)); } catch (IOException e) { log.error("", e); } },
-                error -> { try { emitter.send(SseEmitter.event().data("错误: " + error.getMessage())); } catch (IOException e) { log.error("", e); } emitter.completeWithError(error); },
+        responseFlux.publishOn(reactor.core.scheduler.Schedulers.boundedElastic()).subscribe(
+                chunk -> {
+                    try {
+                        Map<String, String> data = new HashMap<>();
+                        data.put("answer", chunk);
+                        emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(data)));
+                    } catch (IOException e) { log.error("发送SSE失败", e); }
+                },
+                error -> {
+                    try { emitter.send(SseEmitter.event().data("错误: " + error.getMessage())); } catch (IOException e) { log.error("", e); }
+                    emitter.completeWithError(error);
+                },
                 () -> emitter.complete()
         );
         return emitter;

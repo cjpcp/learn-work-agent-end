@@ -134,21 +134,21 @@ public class DifyChatService {
     private Map<String, Object> buildChatRequestBody(String query, List<String> fileUrls, String conversationId, String user) {
         Map<String, Object> requestBody = new HashMap<>();
 
-        // 构建inputs字段（必需）
-        List<Map<String, Object>> inputs = new ArrayList<>();
-        if (fileUrls != null && !fileUrls.isEmpty()) {
-            for (String url : fileUrls) {
-                Map<String, Object> input = new HashMap<>();
-                input.put("transfer_method", "remote_url");
-                input.put("url", url);
-                input.put("type", determineFileType(url));
-                inputs.add(input);
-            }
-        }
+        // inputs 固定为空对象（必填字段）
+        requestBody.put("inputs", new HashMap<>());
 
-        Map<String, Object> inputsWrapper = new HashMap<>();
-        inputsWrapper.put("input", inputs);
-        requestBody.put("inputs", inputsWrapper);
+        // 文件放在顶层 files 数组（Dify chat-messages API 规范）
+        if (fileUrls != null && !fileUrls.isEmpty()) {
+            List<Map<String, Object>> files = new ArrayList<>();
+            for (String url : fileUrls) {
+                Map<String, Object> fileObj = new HashMap<>();
+                fileObj.put("transfer_method", "remote_url");
+                fileObj.put("url", url);
+                fileObj.put("type", determineFileType(url));
+                files.add(fileObj);
+            }
+            requestBody.put("files", files);
+        }
 
         requestBody.put("query", query);
         requestBody.put("response_mode", "streaming");

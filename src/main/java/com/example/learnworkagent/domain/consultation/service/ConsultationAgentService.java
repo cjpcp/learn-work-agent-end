@@ -241,124 +241,32 @@ public class ConsultationAgentService {
 
                     //咨询ai返回结果
                     String prompt = buildPrompt(question);
-                    log.info("调用Dify AI，问题ID: {}, prompt: {}", questionId, prompt);
-                    
-                    if ("IMAGE".equals(question.getQuestionType()) && question.getImageUrl() != null) {
-                        // 处理图片类型问题
-                        return difyChatService.chatStream(prompt, List.of(question.getImageUrl()), null, String.valueOf(question.getUserId()))
-                                //所有数据发送完成时的回调函数
-                                .doOnComplete(() -> {
-                                    log.info("Dify多模态API调用完成，问题ID: {}", questionId);
-                                    //使用专门的线程池来处理阻塞任务
-                                    Mono.fromRunnable(() -> {
-                                                question.setStatus("ANSWERED");
-                                                question.setAnswerSource("AI");
-                                                //保存到数据库可能陷入阻塞
-                                                consultationQuestionRepository.save(question);
-                                            })
-                                            .subscribeOn(Schedulers.boundedElastic())  // 使用专门的阻塞线程池
-                                            .doOnError(error -> log.error("保存AI回答失败，问题ID: {}", questionId, error))
-                                            .subscribe();
-                                })
-                                //当发送过程中发生错误时的回调函数
-                                .doOnError(error -> {
-                                    log.error("AI服务调用失败，问题ID: {}", questionId, error);
-                                    // 保存到数据库可能陷入阻塞
-                                    Mono.fromRunnable(() -> self.transferToHuman(question))
-                                            .subscribeOn(Schedulers.boundedElastic())
-                                            .doOnError(transferError -> log.error("转人工处理失败，问题ID: {}", questionId, transferError))
-                                            .subscribe();
-                                });
-                    } else {
-                        // 处理文本或语音类型问题
-                        return difyChatService.chatStream(prompt, null, null, String.valueOf(question.getUserId()))
-                                //所有数据发送完成时的回调函数
-                                .doOnComplete(() -> {
-                                    log.info("Dify API调用完成，问题ID: {}", questionId);
-                                    //使用专门的线程池来处理阻塞任务
-                                    Mono.fromRunnable(() -> {
-                                                question.setStatus("ANSWERED");
-                                                question.setAnswerSource("AI");
-                                                //保存到数据库可能陷入阻塞
-                                                consultationQuestionRepository.save(question);
-                                            })
-                                            .subscribeOn(Schedulers.boundedElastic())  // 使用专门的阻塞线程池
-                                            .doOnError(error -> log.error("保存AI回答失败，问题ID: {}", questionId, error))
-                                            .subscribe();
-                                })
-                                //当发送过程中发生错误时的回调函数
-                                .doOnError(error -> {
-                                    log.error("AI服务调用失败，问题ID: {}", questionId, error);
-                                    // 保存到数据库可能陷入阻塞
-                                    Mono.fromRunnable(() -> self.transferToHuman(question))
-                                            .subscribeOn(Schedulers.boundedElastic())
-                                            .doOnError(transferError -> log.error("转人工处理失败，问题ID: {}", questionId, transferError))
-                                            .subscribe();
-                                });
-                    }
+                    List<String> fileUrls = resolveFileUrls(question);
+                    log.info("调用Dify AI，问题ID: {}, prompt: {}, 文件数: {}", questionId, prompt,
+                            fileUrls != null ? fileUrls.size() : 0);
+
+                    return difyChatService.chatStream(prompt, fileUrls, null, String.valueOf(question.getUserId()))
+                            //所有数据发送完成时的回调函数
+                            .doOnComplete(() -> {
+                                log.info("Dify API调用完成，问题ID: {}", questionId);
+                                Mono.fromRunnable(() -> {
+                                            question.setStatus("ANSWERED");
+                                            question.setAnswerSource("AI");
+                                            consultationQuestionRepository.save(question);
+                                        })
+                                        .subscribeOn(Schedulers.boundedElastic())
+                                        .doOnError(error -> log.error("保存AI回答失败，问题ID: {}", questionId, error))
+                                        .subscribe();
+                            })
+                            //当发送过程中发生错误时的回调函数
+                            .doOnError(error -> {
+                                log.error("AI服务调用失败，问题ID: {}", questionId, error);
+                                Mono.fromRunnable(() -> self.transferToHuman(question))
+                                        .subscribeOn(Schedulers.boundedElastic())
+                                        .doOnError(transferError -> log.error("转人工处理失败，问题ID: {}", questionId, transferError))
+                                        .subscribe();
+                            });
                 });
     }
 
-//        原版本存在“在非阻塞上下文中使用阻塞调用可能会导致线程匮乏”问题
-//        public Flux<String> processQuestionStream(Long questionId) {
-//        log.info("开始流式处理问题，问题ID: {}", questionId);
-//        //查找问题
-//        ConsultationQuestion question = consultationQuestionRepository.findById(questionId)
-//                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "问题不存在"));
-//
-//
-//
-//        if (shouldTransferToHuman(question)) {
-//            log.info("问题需要转人工，问题ID: {}", questionId);
-//
-//            //使用专门的线程池来处理阻塞任务
-//            Mono.fromRunnable(() -> self.transferToHuman(question))
-//                    .subscribeOn(Schedulers.boundedElastic())
-//                    .doOnError(error -> log.error("问题需要转人工失败，问题ID: {}", questionId, error))
-//                    .subscribe();
-//
-//            return Flux.just("抱歉，这个问题需要人工处理，已为您转接到人工客服。");
-//        }
-//
-//        String cachedAnswer = getCachedAnswer(question);
-//        if (cachedAnswer != null) {
-//            log.info("使用缓存答案，问题ID: {}", questionId);
-//
-//            //使用专门的线程池来处理阻塞任务
-//            Mono.fromRunnable(() -> self.updateQuestionAnswer(question, cachedAnswer, "AI"))
-//                    .subscribeOn(Schedulers.boundedElastic())
-//                    .doOnError(error -> log.error("更新缓存答案失败，问题ID: {}", questionId, error))
-//                    .subscribe();
-//
-//
-//            return Flux.just(cachedAnswer);
-//        }
-//
-//        String prompt = buildPrompt(question);
-//        log.info("调用千问AI，问题ID: {}, prompt: {}", questionId, prompt);
-//        return qianwenApiClient.generateTextStream(prompt)
-//                //所有数据发送完成时的回调函数
-//                .doOnComplete(() -> {
-//                    log.info("千问API调用完成，问题ID: {}", questionId);
-////                  //使用专门的线程池来处理阻塞任务
-//                    Mono.fromRunnable(() -> {
-//                                question.setStatus("ANSWERED");
-//                                question.setAnswerSource("AI");
-//                                //保存到数据库可能陷入阻塞
-//                                consultationQuestionRepository.save(question);
-//                            })
-//                            .subscribeOn(Schedulers.boundedElastic())  // 使用专门的阻塞线程池
-//                            .doOnError(error -> log.error("保存AI回答失败，问题ID: {}", questionId, error))
-//                            .subscribe();
-//                })
-//                //当发送过程中发生错误时的回调函数
-//                .doOnError(error -> {
-//                    log.error("AI服务调用失败，问题ID: {}", questionId, error);
-//                    // 保存到数据库可能陷入阻塞
-//                    Mono.fromRunnable(() -> self.transferToHuman(question))
-//                            .subscribeOn(Schedulers.boundedElastic())
-//                            .doOnError(transferError -> log.error("转人工处理失败，问题ID: {}", questionId, transferError))
-//                            .subscribe();
-//                });
-//    }
 }
