@@ -213,7 +213,7 @@ public class ConsultationController extends BaseController {
     /**
      * 提交咋询问题（流式响应＋附件同步上传）
      */
-    @Operation(summary = "提交咋询问题（流式响应+附件同步上传）")
+    @Operation(summary = "提交咨询问题（流式响应+附件同步上传）")
     @PostMapping(value = "/questions/stream/multipart", produces = MediaType.TEXT_EVENT_STREAM_VALUE,
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public SseEmitter submitQuestionStreamWithFiles(
