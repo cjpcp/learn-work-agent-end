@@ -47,15 +47,11 @@ public class ConsultationAgentService {
     private ConsultationAgentService self;
 
     /**
-     * 从实体的 fileUrls JSON 字段中解析出 URL 列表，合并 voiceUrl
+     * 从实体的 fileUrls JSON 字段中解析出 URL 列表
      */
     private List<String> resolveFileUrls(ConsultationQuestion question) {
         List<String> urls = new ArrayList<>();
-        // 先加 voiceUrl（兼容旧字段）
-        if (question.getVoiceUrl() != null && !question.getVoiceUrl().isBlank()) {
-            urls.add(question.getVoiceUrl());
-        }
-        // 再加附件文件 URL（图片、文档等均存于此）
+        // 加附件文件 URL（图片、文档等均存于此）
         String fileUrlsJson = question.getFileUrls();
         if (fileUrlsJson != null && !fileUrlsJson.isBlank()) {
             try {

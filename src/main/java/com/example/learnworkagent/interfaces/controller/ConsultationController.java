@@ -129,11 +129,6 @@ public class ConsultationController extends BaseController {
         emitter.onError((error) -> log.error("SSE连接错误，userId: {}", userId, error));
         emitter.onTimeout(() -> {
             log.warn("SSE连接超时，userId: {}", userId);
-            try {
-                emitter.send(SseEmitter.event().data("错误: 请求超时"));
-            } catch (IOException e) {
-                log.error("发送超时错误失败", e);
-            }
             emitter.complete();
         });
 
@@ -204,7 +199,7 @@ public class ConsultationController extends BaseController {
     @PostMapping(value = "/questions/stream/multipart", produces = MediaType.TEXT_EVENT_STREAM_VALUE,
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public SseEmitter submitQuestionStreamWithFiles(
-            @RequestParam("questionText") String questionText,
+            @RequestParam(value = "questionText", required = false, defaultValue = "") String questionText,
             @RequestParam(value = "sessionId", required = false) String sessionId,
             @RequestParam(value = "files", required = false) MultipartFile[] files) {
 
@@ -285,19 +280,8 @@ public class ConsultationController extends BaseController {
         emitter.onError(e -> log.error("multipart SSE 错误, userId: {}", userId, e));
 
         emitter.onTimeout(() -> {
-
-            try {
-
-                emitter.send(SseEmitter.event().data("错误: 请求超时"));
-
-            } catch (IOException e) {
-
-                log.error("", e);
-
-            }
-
+            log.warn("multipart SSE 超时, userId: {}", userId);
             emitter.complete();
-
         });
 
 
