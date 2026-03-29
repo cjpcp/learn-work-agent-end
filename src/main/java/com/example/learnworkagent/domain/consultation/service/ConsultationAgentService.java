@@ -7,6 +7,7 @@ import com.example.learnworkagent.domain.consultation.entity.HumanTransfer;
 import com.example.learnworkagent.domain.consultation.repository.ConsultationQuestionRepository;
 import com.example.learnworkagent.domain.consultation.repository.HumanTransferRepository;
 import com.example.learnworkagent.infrastructure.external.dify.DifyChatService;
+import com.example.learnworkagent.infrastructure.external.dify.SpeechToTextService;
 import com.example.learnworkagent.infrastructure.service.CacheService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,6 +36,7 @@ public class ConsultationAgentService {
 
     private final ConsultationQuestionRepository consultationQuestionRepository;
     private final DifyChatService difyChatService;
+    private final SpeechToTextService speechToTextService;
     private final CacheService cacheService;
     private final HumanTransferRepository humanTransferRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -45,22 +47,20 @@ public class ConsultationAgentService {
     private ConsultationAgentService self;
 
     /**
-     * 从实体的 fileUrls JSON 字段中解析出 URL 列表，合并 imageUrl/voiceUrl
+     * 从实体的 fileUrls JSON 字段中解析出 URL 列表，合并 voiceUrl
      */
     private List<String> resolveFileUrls(ConsultationQuestion question) {
         List<String> urls = new ArrayList<>();
-        // 先加 imageUrl / voiceUrl（兼容旧字段）
-        if (question.getImageUrl() != null && !question.getImageUrl().isBlank()) {
-            urls.add(question.getImageUrl());
-        }
+        // 先加 voiceUrl（兼容旧字段）
         if (question.getVoiceUrl() != null && !question.getVoiceUrl().isBlank()) {
             urls.add(question.getVoiceUrl());
         }
-        // 再加附件文件 URL
+        // 再加附件文件 URL（图片、文档等均存于此）
         String fileUrlsJson = question.getFileUrls();
         if (fileUrlsJson != null && !fileUrlsJson.isBlank()) {
             try {
-                List<String> parsed = objectMapper.readValue(fileUrlsJson, new TypeReference<List<String>>() {});
+                List<String> parsed = objectMapper.readValue(fileUrlsJson, new TypeReference<>() {
+                });
                 if (parsed != null) urls.addAll(parsed);
             } catch (Exception e) {
                 log.warn("解析 fileUrls JSON 失败，questionId: {}, json: {}", question.getId(), fileUrlsJson, e);
@@ -94,9 +94,12 @@ public class ConsultationAgentService {
                 return;
             }
 
-            // 根据问题类型调用相应的AI服务
-            String prompt = buildPrompt(question);
+            // 动态构造 query（整合语音转文字），再调用原有的 Dify 智能咨询服务
             List<String> fileUrls = resolveFileUrls(question);
+            String query = buildQuery(question);
+            String prompt = buildPrompt(question, query);
+            log.info("调用Dify AI，问题ID: {}, 文件数: {}", questionId,
+                    fileUrls != null ? fileUrls.size() : 0);
             difyChatService.chatStream(prompt, fileUrls, null, String.valueOf(question.getUserId()))
                     .collectList()
                     .subscribe(
@@ -159,15 +162,73 @@ public class ConsultationAgentService {
 
     /**
      * 构建AI提示词
+     *
+     * @param question 咨询问题实体（用于获取分类等元数据）
+     * @param query    经过语音转文字处理后的最终用户问题内容
      */
-    private String buildPrompt(ConsultationQuestion question) {
-
+    private String buildPrompt(ConsultationQuestion question, String query) {
         return "你是一个学工智能助手，专门回答学生关于奖助勤贷、宿舍管理、违纪申诉、心理健康、就业指导等方面的问题。" +
                 "\n\n问题分类：" + question.getCategory() +
-                "\n问题内容：" + question.getQuestionText() +
+                "\n问题内容：" + query +
                 "\n\n请提供准确、详细的回答，并给出相关的流程指引。";
     }
 
+    /**
+     * 动态构造发送给Dify智能咨询服务的 query。
+     * <ul>
+     *   <li>仅有语音（无文本）：调用语音转文字，将结果直接作为 query。</li>
+     *   <li>既有文本又有语音：将语音转文字结果拼接到用户文本之后，共同作为 query。</li>
+     *   <li>仅有文本（无语音）：直接使用 questionText 作为 query，不调用语音服务。</li>
+     * </ul>
+     *
+     * @param question 咨询问题实体
+     * @return 最终 query 字符串
+     */
+    private String buildQuery(ConsultationQuestion question) {
+        String textPart = question.getQuestionText();
+        String voiceUrl = question.getVoiceUrl();
+        String userId   = String.valueOf(question.getUserId());
+
+        boolean hasText  = textPart != null && !textPart.isBlank();
+        boolean hasVoice = voiceUrl  != null && !voiceUrl.isBlank();
+
+        if (!hasText && !hasVoice) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "问题内容不能为空（文本和语音均为空）");
+        }
+
+        if (!hasVoice) {
+            // 仅有文本，直接返回
+            return textPart;
+        }
+
+        // 存在语音：调用语音转文字服务（同步），并做异常保护
+        log.info("检测到语音URL，开始语音转文字，questionId: {}, voiceUrl: {}", question.getId(), voiceUrl);
+        try {
+            String speechText = speechToTextService.convertVoiceUrlToText(voiceUrl, userId);
+            if (speechText == null || speechText.isBlank()) {
+                log.warn("语音转文字结果为空，questionId: {}", question.getId());
+                // 转文字结果为空时，退化为纯文本（若有）
+                return hasText ? textPart : "";
+            }
+            if (hasText) {
+                // 用户文本 + 语音转文字内容拼接
+                String combined = textPart + "\n[语音补充内容]：" + speechText;
+                log.info("文本与语音转文字内容已拼接，questionId: {}", question.getId());
+                return combined;
+            }
+            // 仅有语音，直接使用转文字结果
+            log.info("仅语音输入，使用语音转文字结果作为query，questionId: {}", question.getId());
+            return speechText;
+        } catch (BusinessException e) {
+            // 语音转文字失败，降级处理：若有文本则继续用文本，否则向上抛出
+            log.error("语音转文字失败，questionId: {}，尝试降级处理", question.getId(), e);
+            if (hasText) {
+                log.warn("语音转文字失败，降级使用用户文本，questionId: {}", question.getId());
+                return textPart;
+            }
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "语音转文字失败且无文本内容，无法处理该问题");
+        }
+    }
     /**
      * 从缓存获取答案
      */
@@ -239,13 +300,15 @@ public class ConsultationAgentService {
                         return Flux.just(cachedAnswer);
                     }
 
-                    //咨询ai返回结果
-                    String prompt = buildPrompt(question);
+                    // 动态构造 query（整合语音转文字），再调用原有的 Dify 智能咨询服务
                     List<String> fileUrls = resolveFileUrls(question);
-                    log.info("调用Dify AI，问题ID: {}, prompt: {}, 文件数: {}", questionId, prompt,
+                    String query = buildQuery(question);
+                    String prompt = buildPrompt(question, query);
+                    log.info("调用Dify AI，问题ID: {}, 文件数: {}", questionId,
                             fileUrls != null ? fileUrls.size() : 0);
 
-                    return difyChatService.chatStream(prompt, fileUrls, null, String.valueOf(question.getUserId()))
+                    return difyChatService.chatStream(prompt, fileUrls, null,
+                                    String.valueOf(question.getUserId()))
                             //所有数据发送完成时的回调函数
                             .doOnComplete(() -> {
                                 log.info("Dify API调用完成，问题ID: {}", questionId);

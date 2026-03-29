@@ -36,14 +36,13 @@ public class ConsultationService {
      */
     @Transactional
     public ConsultationQuestion submitQuestion(Long userId, String questionText, String questionType,
-                                               String category, String imageUrl, String voiceUrl, String sessionId,
+                                               String category, String voiceUrl, String sessionId,
                                                List<ConsultationRequest.FileInput> files) {
         ConsultationQuestion question = new ConsultationQuestion();
         question.setUserId(userId);
         question.setQuestionText(questionText);
         question.setQuestionType(questionType);
         question.setCategory(category);
-        question.setImageUrl(imageUrl);
         question.setVoiceUrl(voiceUrl);
         question.setSessionId(sessionId);
         question.setStatus("PENDING");
@@ -139,15 +138,14 @@ public class ConsultationService {
      * 提交咨询问题（流式响应）
      */
     public Flux<String> submitQuestionStream(Long userId, String questionText, String questionType,
-                                             String category, String imageUrl, String voiceUrl, String sessionId,
+                                             String category, String voiceUrl, String sessionId,
                                              List<ConsultationRequest.FileInput> files) {
-        //保存问题
+        // 保存问题
         ConsultationQuestion question = new ConsultationQuestion();
         question.setUserId(userId);
         question.setQuestionText(questionText);
         question.setQuestionType(questionType);
         question.setCategory(category);
-        question.setImageUrl(imageUrl);
         question.setVoiceUrl(voiceUrl);
         question.setSessionId(sessionId);
         question.setStatus("PENDING");

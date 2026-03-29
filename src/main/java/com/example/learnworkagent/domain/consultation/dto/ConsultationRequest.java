@@ -11,7 +11,9 @@ import java.util.List;
 @Data
 public class ConsultationRequest {
 
-    @NotBlank(message = "问题内容不能为空")
+    /**
+     * 问题文本内容（纯语音提问时可为空）
+     */
     private String questionText;
 
     /**
@@ -26,12 +28,8 @@ public class ConsultationRequest {
     private String category;
 
     /**
-     * 图片URL（如果是图片类型问题）
-     */
-    private String imageUrl;
-
-    /**
      * 语音URL（如果是语音类型问题）
+     * 图片、文档等附件文件统一通过 files 字段传入
      */
     private String voiceUrl;
 

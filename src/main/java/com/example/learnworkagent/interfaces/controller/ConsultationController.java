@@ -6,14 +6,12 @@ import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.domain.consultation.dto.ConsultationRequest;
-import com.example.learnworkagent.domain.consultation.dto.DifyConsultationRequest;
 import com.example.learnworkagent.domain.consultation.dto.TransferToHumanRequest;
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
 import com.example.learnworkagent.domain.consultation.entity.HumanTransfer;
 import com.example.learnworkagent.domain.consultation.repository.HumanTransferRepository;
 import com.example.learnworkagent.domain.consultation.service.ConsultationService;
 import com.example.learnworkagent.domain.consultation.service.HumanTransferService;
-import com.example.learnworkagent.infrastructure.external.dify.DifyChatService;
 import com.example.learnworkagent.infrastructure.external.oss.OssService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,7 +45,6 @@ public class ConsultationController extends BaseController {
     private final HumanTransferService humanTransferService;
     private final HumanTransferRepository humanTransferRepository;
     private final OssService ossService;
-    private final DifyChatService difyChatService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Operation(summary = "提交咋询问题")
@@ -59,7 +56,6 @@ public class ConsultationController extends BaseController {
                 request.getQuestionText(),
                 request.getQuestionType(),
                 request.getCategory(),
-                request.getImageUrl(),
                 request.getVoiceUrl(),
                 request.getSessionId(),
                 request.getFiles()
@@ -146,7 +142,6 @@ public class ConsultationController extends BaseController {
                 request.getQuestionText(),
                 request.getQuestionType(),
                 request.getCategory(),
-                request.getImageUrl(),
                 request.getVoiceUrl(),
                 request.getSessionId(),
                 request.getFiles()
@@ -186,14 +181,6 @@ public class ConsultationController extends BaseController {
         return emitter;
     }
 
-    @Operation(summary = "上传咋询图片")
-    @PostMapping(value = "/upload/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Result<String> uploadImage(@RequestParam("file") MultipartFile file) {
-        Long userId = getCurrentUserId();
-        String imageUrl = ossService.uploadConsultationFile(file, userId, "image");
-        return Result.success(imageUrl);
-    }
-
     @Operation(summary = "上传咋询语音")
     @PostMapping(value = "/upload/voice", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Result<String> uploadVoice(@RequestParam("file") MultipartFile file) {
@@ -227,67 +214,119 @@ public class ConsultationController extends BaseController {
             try {
                 errorEmitter.send(SseEmitter.event().data("错误: 用户未登录"));
                 errorEmitter.complete();
-            } catch (IOException e) { errorEmitter.completeWithError(e); }
+            } catch (IOException e) {
+                errorEmitter.completeWithError(e);
+            }
             return errorEmitter;
         }
 
         log.info("收到multipart流式请求, userId: {}, questionText: {}, 文件数: {}",
                 userId, questionText, files != null ? files.length : 0);
 
-        // 先将附件上传到OSS，收集URL
-        List<String> fileUrls = new java.util.ArrayList<>();
+        // 按 content-type 将语音单独提取为 voiceUrl，图片/文档放入 fileInputs
+
+        String uploadedVoiceUrl = null;
+
+        List<ConsultationRequest.FileInput> fileInputs = new java.util.ArrayList<>();
+
         if (files != null) {
+
             for (MultipartFile file : files) {
+
                 if (file != null && !file.isEmpty()) {
+
                     try {
+
                         String ct = file.getContentType() != null ? file.getContentType() : "";
-                        String fileType = ct.startsWith("audio/") ? "voice" : ct.startsWith("image/") ? "image" : "file";
-                        String url = ossService.uploadConsultationFile(file, userId, fileType);
-                        fileUrls.add(url);
-                        log.info("附件上传成功: {}", url);
+
+                        if (ct.startsWith("audio/")) {
+
+                            uploadedVoiceUrl = ossService.uploadConsultationFile(file, userId, "voice");
+
+                            log.info("语音上传成功: {}", uploadedVoiceUrl);
+
+                        } else {
+
+                            String url = ossService.uploadConsultationFile(file, userId, "file");
+
+                            ConsultationRequest.FileInput fi = new ConsultationRequest.FileInput();
+
+                            fi.setUrl(url);
+
+                            fi.setTransferMethod("remote_url");
+
+                            String lower = url.toLowerCase();
+
+                            fi.setType(lower.matches(".*\\.(jpg|jpeg|png|gif|webp|bmp)$") ? "image" : "document");
+
+                            fileInputs.add(fi);
+
+                            log.info("附件上传成功: {}", url);
+
+                        }
+
                     } catch (Exception e) {
-                        log.error("附件上传失败: {}", file.getOriginalFilename(), e);
+
+                        log.error("文件上传失败: {}", file.getOriginalFilename(), e);
+
                     }
+
                 }
+
             }
+
         }
 
-        List<com.example.learnworkagent.domain.consultation.dto.ConsultationRequest.FileInput> fileInputs =
-                fileUrls.stream().map(url -> {
-                    com.example.learnworkagent.domain.consultation.dto.ConsultationRequest.FileInput fi =
-                            new com.example.learnworkagent.domain.consultation.dto.ConsultationRequest.FileInput();
-                    fi.setUrl(url);
-                    fi.setTransferMethod("remote_url");
-                    String lower = url.toLowerCase();
-                    fi.setType(lower.matches(".*\\.(jpg|jpeg|png|gif|webp|bmp)$") ? "image"
-                            : lower.matches(".*\\.(mp3|wav|ogg|m4a|webm|aac)$") ? "audio" : "document");
-                    return fi;
-                }).toList();
 
         SseEmitter emitter = new SseEmitter(120000L);
+
         emitter.onCompletion(() -> log.info("multipart SSE 完成, userId: {}", userId));
+
         emitter.onError(e -> log.error("multipart SSE 错误, userId: {}", userId, e));
+
         emitter.onTimeout(() -> {
-            try { emitter.send(SseEmitter.event().data("错误: 请求超时")); } catch (IOException e) { log.error("", e); }
+
+            try {
+
+                emitter.send(SseEmitter.event().data("错误: 请求超时"));
+
+            } catch (IOException e) {
+
+                log.error("", e);
+
+            }
+
             emitter.complete();
+
         });
 
-        reactor.core.publisher.Flux<String> responseFlux = consultationService.submitQuestionStream(
-                userId, questionText, "TEXT", null, null, null, sessionId, fileInputs);
 
-        responseFlux.publishOn(reactor.core.scheduler.Schedulers.boundedElastic()).subscribe(
+        Flux<String> responseFlux = consultationService.submitQuestionStream(
+
+                userId, questionText, "TEXT", null, uploadedVoiceUrl, sessionId,
+
+                fileInputs.isEmpty() ? null : fileInputs);
+
+
+        responseFlux.publishOn(Schedulers.boundedElastic()).subscribe(
                 chunk -> {
                     try {
                         Map<String, String> data = new HashMap<>();
                         data.put("answer", chunk);
                         emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(data)));
-                    } catch (IOException e) { log.error("发送SSE失败", e); }
+                    } catch (IOException e) {
+                        log.error("发送SSE失败", e);
+                    }
                 },
                 error -> {
-                    try { emitter.send(SseEmitter.event().data("错误: " + error.getMessage())); } catch (IOException e) { log.error("", e); }
+                    try {
+                        emitter.send(SseEmitter.event().data("错误: " + error.getMessage()));
+                    } catch (IOException e) {
+                        log.error("", e);
+                    }
                     emitter.completeWithError(error);
                 },
-                () -> emitter.complete()
+                emitter::complete
         );
         return emitter;
     }
@@ -351,6 +390,4 @@ public class ConsultationController extends BaseController {
         PageResult<HumanTransfer> result = humanTransferService.getCompletedTransfers(staffId, pageRequest);
         return Result.success(result);
     }
-
-    //todo 转人工后的人工操作
 }

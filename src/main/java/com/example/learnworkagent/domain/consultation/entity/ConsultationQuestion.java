@@ -31,25 +31,18 @@ public class ConsultationQuestion extends BaseEntity {
     private String questionText;
 
     /**
-     * 问题类型（TEXT-文本, VOICE-语音, IMAGE-图片）
+     * 问题类型（TEXT-文本, VOICE-语音, IMAGE-图片�?
      */
     @Comment("问题类型")
     @Column(name = "question_type", nullable = false, length = 20)
     private String questionType;
 
     /**
-     * 问题分类（AWARD-奖助勤贷, DORM-宿舍管理, DISCIPLINE-违纪申诉, MENTAL-心理健康, EMPLOYMENT-就业指导）
+     * 问题分类（AWARD-奖助勤贷, DORM-宿舍管理, DISCIPLINE-违纪申诉, MENTAL-心理健康, EMPLOYMENT-就业指导�?
      */
     @Comment("问题分类")
     @Column(name = "category", length = 50)
     private String category;
-
-    /**
-     * 图片URL（如果是图片类型问题）
-     */
-    @Comment("图片URL")
-    @Column(name = "image_url", length = 500)
-    private String imageUrl;
 
     /**
      * 语音URL（如果是语音类型问题）
@@ -66,14 +59,14 @@ public class ConsultationQuestion extends BaseEntity {
     private String aiAnswer;
 
     /**
-     * 回答来源（AI-智能回答, HUMAN-人工回答）
+     * 回答来源（AI-智能回答, HUMAN-人工回答
      */
     @Comment("回答来源")
     @Column(name = "answer_source", length = 20)
     private String answerSource;
 
     /**
-     * 是否已转人工（true-已转人工, false-未转人工）
+     * 是否已转人工（true-已转人工, false-未转人工
      */
     @Comment("是否已转人工")
     @Column(name = "transferred_to_human", nullable = false)
@@ -87,16 +80,16 @@ public class ConsultationQuestion extends BaseEntity {
     private String transferReason;
 
     /**
-     * 状态（PENDING-待回答, ANSWERED-已回答, TRANSFERRED-已转人工）
+     * 状态（PENDING-待回�? ANSWERED-已回�? TRANSFERRED-已转人工�?
      */
     @Comment("状态")
     @Column(name = "status", nullable = false, length = 20)
     private String status = "PENDING";
 
     /**
-     * 满意度评分（1-5）
+     * 满意度评分（1-5�?
      */
-    @Comment("满意度评分")
+    @Comment("满意度评")
     @Column(name = "satisfaction_score")
     private Integer satisfactionScore;
 
@@ -108,7 +101,7 @@ public class ConsultationQuestion extends BaseEntity {
     private String sessionId;
 
     /**
-     * 附件文件URL列表（JSON数组，存储已上传至OSS的文件URL）
+     * 附件文件URL列表（JSON数组，存储已上传至OSS的文件URL�?
      */
     @Comment("附件文件URL列表(JSON)")
     @Column(name = "file_urls", columnDefinition = "TEXT")
