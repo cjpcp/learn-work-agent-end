@@ -246,57 +246,57 @@ public class LeaveApplicationService {
         }
 
         try {
-            // 生成请假条PDF
-            byte[] pdfBytes = templateService.generateLeaveSlip(application);
+            // 生成请假条 Word 文档
+            byte[] docBytes = templateService.generateLeaveSlip(application);
 
-            // 上传到OSS
-            // 创建MultipartFile对象
-            MultipartFile pdfFile = new MultipartFile() {
+            // 上传到OSS（Word文档格式）
+            final String fileName = "leave-slip-" + application.getId() + ".docx";
+            MultipartFile docxFile = new MultipartFile() {
 
                 @Override
                 @NotNull
                 public String getName() {
-                    return "leave-slip-" + application.getId() + ".pdf";
+                    return fileName;
                 }
 
                 @Override
                 public String getOriginalFilename() {
-                    return "leave-slip-" + application.getId() + ".pdf";
+                    return fileName;
                 }
 
                 @Override
                 public String getContentType() {
-                    return "application/pdf";
+                    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
                 }
 
                 @Override
                 public boolean isEmpty() {
-                    return pdfBytes == null || pdfBytes.length == 0;
+                    return docBytes == null || docBytes.length == 0;
                 }
 
                 @Override
                 public long getSize() {
-                    return pdfBytes.length;
+                    return docBytes.length;
                 }
 
                 @Override
                 public byte @NotNull [] getBytes() {
-                    return pdfBytes;
+                    return docBytes;
                 }
 
                 @Override
                 public @NotNull InputStream getInputStream() {
-                    return new ByteArrayInputStream(pdfBytes);
+                    return new ByteArrayInputStream(docBytes);
                 }
 
                 @Override
                 public void transferTo(File dest) throws IOException, IllegalStateException {
-                    Files.write(dest.toPath(), pdfBytes);
+                    Files.write(dest.toPath(), docBytes);
                 }
             };
 
             // 上传到OSS
-            String fileUrl = ossService.uploadFile(pdfFile, "leave-slips");
+            String fileUrl = ossService.uploadFile(docxFile, "leave-slips");
 
             // 更新请假条状态和URL
             application.setLeaveSlipStatus("GENERATED");

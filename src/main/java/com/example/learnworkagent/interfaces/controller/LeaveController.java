@@ -125,7 +125,7 @@ public class LeaveController extends BaseController {
      * @param id       请假id
      * @param response HTTP响应
      */
-    @Operation(summary = "下载请假条PDF", description = "下载已生成的请假条PDF文件")
+    @Operation(summary = "下载请假条", description = "下载已生成的请假条Word文档(.docx)")
     @GetMapping("/applications/{id}/download-slip")
     public void downloadLeaveSlip(@PathVariable Long id, HttpServletResponse response) {
         LeaveApplication application = leaveApplicationService.getApplicationById(id);
@@ -138,6 +138,11 @@ public class LeaveController extends BaseController {
         }
 
         try {
+            String fileName = "请假条_" + id + ".docx";
+            String encodedFileName = java.net.URLEncoder.encode(fileName, java.nio.charset.StandardCharsets.UTF_8)
+                    .replace("+", "%20");
+            response.setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+            response.setHeader("Content-Disposition", "attachment; filename=\"" + encodedFileName + "\"; filename*=UTF-8''" + encodedFileName);
             // 重定向到OSS文件URL
             response.sendRedirect(application.getLeaveSlipUrl());
         } catch (Exception e) {
