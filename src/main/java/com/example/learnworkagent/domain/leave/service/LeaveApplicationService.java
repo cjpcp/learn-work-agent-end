@@ -10,10 +10,7 @@ import com.example.learnworkagent.domain.approval.service.ApprovalService;
 import com.example.learnworkagent.domain.leave.dto.LeaveApplicationRequest;
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.repository.LeaveApplicationRepository;
-import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
-import com.example.learnworkagent.domain.notification.service.NotificationService;
-import com.example.learnworkagent.domain.user.entity.User;
-import com.example.learnworkagent.domain.user.repository.UserRepository;
+
 import com.example.learnworkagent.infrastructure.external.oss.OssService;
 import com.example.learnworkagent.infrastructure.external.template.TemplateService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,7 +33,6 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
@@ -52,8 +48,6 @@ public class LeaveApplicationService {
     private final LeaveApplicationRepository leaveApplicationRepository;
     private final TemplateService templateService;
     private final OssService ossService;
-    private final NotificationService notificationService;
-    private final UserRepository userRepository;
     private final ApprovalService approvalService;
     private final ObjectMapper objectMapper;
 
@@ -134,10 +128,6 @@ public class LeaveApplicationService {
         if ("APPROVED".equals(refreshedApplication.getApprovalStatus())) {
             generateLeaveSlip(refreshedApplication);
         }
-
-        if (!"PENDING".equals(refreshedApplication.getApprovalStatus())) {
-            sendApprovalNotification(refreshedApplication, approverId);
-        }
     }
 
     private ApprovalTask getCurrentTask(ApprovalInstance approvalInstance, Long approverId) {
@@ -150,80 +140,6 @@ public class LeaveApplicationService {
                 .filter(task -> "PROCESSING".equals(task.getStatus()))
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "当前没有可处理的审批任务"));
-    }
-
-    /**
-     * 发送请假审批结果通知
-     *
-     * @param application 请假申请
-     * @param approverId  审批人ID
-     */
-    private void sendApprovalNotification(LeaveApplication application, Long approverId) {
-        try {
-            // 获取申请人信息
-            User applicant = userRepository.findById(application.getApplicantId())
-                    .orElse(null);
-
-            // 获取审批人信息
-            User approver = userRepository.findById(approverId)
-                    .orElse(null);
-
-            if (applicant == null) {
-                log.warn("请假申请人不存在，无法发送通知，用户ID: {}", application.getApplicantId());
-                return;
-            }
-
-            // 构建通知消息
-            String statusText = "APPROVED".equals(application.getApprovalStatus()) ? "已通过" : "未通过";
-            String title = "请假申请审批结果通知";
-            String content = String.format("您的%s（%s至%s，共%d天）申请%s。审批意见：%s",
-                    getLeaveTypeName(application.getLeaveType()),
-                    application.getStartDate(),
-                    application.getEndDate(),
-                    application.getDays(),
-                    statusText,
-                    application.getApprovalComment());
-
-            NotificationMessage message = NotificationMessage.builder()
-                    .userId(application.getApplicantId())
-                    .email(applicant.getEmail())
-                    .type("LEAVE_APPROVAL")
-                    .title(title)
-                    .content(content)
-                    .businessId(application.getId())
-                    .businessType("LEAVE_APPLICATION")
-                    .channels(Arrays.asList("SITE", "EMAIL"))
-                    .applicantName(applicant.getRealName())
-                    .applicationType(application.getLeaveType())
-                    .approvalStatus(application.getApprovalStatus())
-                    .approvalComment(application.getApprovalComment())
-                    .approverName(approver != null ? approver.getRealName() : "系统")
-                    .build();
-
-            // 发送通知
-            notificationService.sendAwardApprovalNotification(message);
-
-            log.info("请假审批结果通知已发送，申请ID: {}, 用户ID: {}",
-                    application.getId(), application.getApplicantId());
-        } catch (Exception e) {
-            log.error("发送请假审批结果通知失败，申请ID: {}", application.getId(), e);
-            // 通知发送失败不影响主流程
-        }
-    }
-
-    /**
-     * 获取请假类型名称
-     *
-     * @param leaveType 请假类型代码
-     * @return 请假类型名称
-     */
-    private String getLeaveTypeName(String leaveType) {
-        return switch (leaveType) {
-            case "SICK" -> "病假";
-            case "PERSONAL" -> "事假";
-            case "OFFICIAL" -> "公假";
-            default -> "请假";
-        };
     }
 
     /**
@@ -246,57 +162,57 @@ public class LeaveApplicationService {
         }
 
         try {
-            // 生成请假条PDF
-            byte[] pdfBytes = templateService.generateLeaveSlip(application);
+            // 生成请假条 Word 文档
+            byte[] docBytes = templateService.generateLeaveSlip(application);
 
-            // 上传到OSS
-            // 创建MultipartFile对象
-            MultipartFile pdfFile = new MultipartFile() {
+            // 上传到OSS（Word文档格式）
+            final String fileName = "leave-slip-" + application.getId() + ".docx";
+            MultipartFile docxFile = new MultipartFile() {
 
                 @Override
                 @NotNull
                 public String getName() {
-                    return "leave-slip-" + application.getId() + ".pdf";
+                    return fileName;
                 }
 
                 @Override
                 public String getOriginalFilename() {
-                    return "leave-slip-" + application.getId() + ".pdf";
+                    return fileName;
                 }
 
                 @Override
                 public String getContentType() {
-                    return "application/pdf";
+                    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
                 }
 
                 @Override
                 public boolean isEmpty() {
-                    return pdfBytes == null || pdfBytes.length == 0;
+                    return docBytes == null || docBytes.length == 0;
                 }
 
                 @Override
                 public long getSize() {
-                    return pdfBytes.length;
+                    return docBytes.length;
                 }
 
                 @Override
                 public byte @NotNull [] getBytes() {
-                    return pdfBytes;
+                    return docBytes;
                 }
 
                 @Override
                 public @NotNull InputStream getInputStream() {
-                    return new ByteArrayInputStream(pdfBytes);
+                    return new ByteArrayInputStream(docBytes);
                 }
 
                 @Override
                 public void transferTo(File dest) throws IOException, IllegalStateException {
-                    Files.write(dest.toPath(), pdfBytes);
+                    Files.write(dest.toPath(), docBytes);
                 }
             };
 
             // 上传到OSS
-            String fileUrl = ossService.uploadFile(pdfFile, "leave-slips");
+            String fileUrl = ossService.uploadFile(docxFile, "leave-slips");
 
             // 更新请假条状态和URL
             application.setLeaveSlipStatus("GENERATED");

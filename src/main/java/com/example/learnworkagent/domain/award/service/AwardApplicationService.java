@@ -10,10 +10,6 @@ import com.example.learnworkagent.domain.approval.service.ApprovalService;
 import com.example.learnworkagent.domain.award.dto.AwardApplicationRequest;
 import com.example.learnworkagent.domain.award.entity.AwardApplication;
 import com.example.learnworkagent.domain.award.repository.AwardApplicationRepository;
-import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
-import com.example.learnworkagent.domain.notification.service.NotificationService;
-import com.example.learnworkagent.domain.user.entity.User;
-import com.example.learnworkagent.domain.user.repository.UserRepository;
 import com.example.learnworkagent.infrastructure.external.dify.DifyWorkflowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -28,11 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * 奖助申请服务
@@ -44,8 +36,6 @@ public class AwardApplicationService {
 
     private final AwardApplicationRepository awardApplicationRepository;
     private final DifyWorkflowService difyWorkflowService;
-    private final NotificationService notificationService;
-    private final UserRepository userRepository;
     private final ApprovalService approvalService;
     private final ObjectMapper objectMapper;
 
@@ -250,12 +240,7 @@ public class AwardApplicationService {
 
         approvalService.processApprovalTask(currentTask.getId(), approverId, approvalStatus, approvalComment);
 
-        AwardApplication refreshedApplication = awardApplicationRepository.findById(applicationId)
-                .orElseThrow(() -> new BusinessException(ResultCode.AWARD_APPLICATION_NOT_FOUND));
-
-        if (!"PENDING".equals(refreshedApplication.getApprovalStatus())) {
-            sendApprovalNotification(refreshedApplication, approverId);
-        }
+        // 通知由 ApprovalServiceImpl 统一处理
     }
 
     private ApprovalTask getCurrentTask(ApprovalInstance approvalInstance, Long approverId) {
@@ -270,76 +255,7 @@ public class AwardApplicationService {
                 .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "当前没有可处理的审批任务"));
     }
 
-    /**
-     * 发送奖助审批结果通知
-     *
-     * @param application 奖助申请
-     * @param approverId  审批人ID
-     */
-    private void sendApprovalNotification(AwardApplication application, Long approverId) {
-        try {
-            // 获取申请人信息
-            User applicant = userRepository.findById(application.getApplicantId())
-                    .orElse(null);
 
-            // 获取审批人信息
-            User approver = userRepository.findById(approverId)
-                    .orElse(null);
-
-            if (applicant == null) {
-                log.warn("奖助申请人不存在，无法发送通知，用户ID: {}", application.getApplicantId());
-                return;
-            }
-
-            // 构建通知消息
-            String statusText = "APPROVED".equals(application.getApprovalStatus()) ? "已通过" : "未通过";
-            String title = "奖助申请审批结果通知";
-            String content = String.format("您的%s（%s）申请%s。审批意见：%s",
-                    getApplicationTypeName(application.getApplicationType()),
-                    application.getAwardName(),
-                    statusText,
-                    application.getApprovalComment());
-
-            NotificationMessage message = NotificationMessage.builder()
-                    .userId(application.getApplicantId())
-                    .email(applicant.getEmail())
-                    .type("AWARD_APPROVAL")
-                    .title(title)
-                    .content(content)
-                    .businessId(application.getId())
-                    .businessType("AWARD_APPLICATION")
-                    .channels(Arrays.asList("SITE", "EMAIL"))
-                    .applicantName(applicant.getRealName())
-                    .applicationType(application.getApplicationType())
-                    .awardName(application.getAwardName())
-                    .amount(application.getAmount())
-                    .approvalStatus(application.getApprovalStatus())
-                    .approvalComment(application.getApprovalComment())
-                    .approverName(approver != null ? approver.getRealName() : "系统")
-                    .build();
-
-            // 发送通知
-            notificationService.sendAwardApprovalNotification(message);
-
-            log.info("审批结果通知已发送，申请ID: {}, 用户ID: {}",
-                    application.getId(), application.getApplicantId());
-        } catch (Exception e) {
-            log.error("发送审批结果通知失败，申请ID: {}", application.getId(), e);
-            // 通知发送失败不影响主流程
-        }
-    }
-
-    /**
-     * 获取申请类型名称
-     */
-    private String getApplicationTypeName(String type) {
-        return switch (type) {
-            case "SCHOLARSHIP" -> "奖学金";
-            case "GRANT" -> "助学金";
-            case "SUBSIDY" -> "困难补助";
-            default -> type;
-        };
-    }
 
     /**
      * 获取申请详情

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -68,6 +69,11 @@ public class NotificationMessage implements Serializable {
     // ==================== 奖助申请相关字段 ====================
 
     /**
+     * 接收人姓名
+     */
+    private String receiverName;
+
+    /**
      * 申请人姓名
      */
     private String applicantName;
@@ -101,4 +107,41 @@ public class NotificationMessage implements Serializable {
      * 审批人姓名
      */
     private String approverName;
+
+    // ==================== 请假申请相关字段 ====================
+
+    /**
+     * 请假开始日期
+     */
+    private LocalDate leaveStartDate;
+
+    /**
+     * 请假结束日期
+     */
+    private LocalDate leaveEndDate;
+
+    /**
+     * 请假天数
+     */
+    private Integer leaveDays;
+
+    /**
+     * 请假原因
+     */
+    private String leaveReason;
+
+    // ==================== 微信相关字段 ====================
+
+    /**
+     * 用户微信 OpenID（公众号推送使用）
+     */
+    private String wechatOpenId;
+
+    // ==================== 企业微信相关字段 ====================
+
+    /**
+     * 用户企业微信账号 UserId（应用消息推送使用）
+     * 对应企业微信管理后台中的成员账号
+     */
+    private String weworkUserId;
 }

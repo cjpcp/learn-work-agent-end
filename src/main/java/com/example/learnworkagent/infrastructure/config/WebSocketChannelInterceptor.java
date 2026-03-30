@@ -1,6 +1,7 @@
 package com.example.learnworkagent.infrastructure.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -10,6 +11,7 @@ import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
 
 import java.security.Principal;
+import java.util.Objects;
 
 /**
  * WebSocket Channel拦截器
@@ -20,12 +22,12 @@ import java.security.Principal;
 public class WebSocketChannelInterceptor implements ChannelInterceptor {
 
     @Override
-    public Message<?> preSend(Message<?> message, MessageChannel channel) {
+    public Message<?> preSend(@NotNull Message<?> message, @NotNull MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
         
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
             // 从握手时设置的attributes中获取userId
-            Object userId = accessor.getSessionAttributes().get("userId");
+            Object userId = Objects.requireNonNull(accessor.getSessionAttributes()).get("userId");
             log.info("STOMP CONNECT - userId from session: {}", userId);
             if (userId != null) {
                 // 设置用户Principal

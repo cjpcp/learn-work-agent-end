@@ -33,6 +33,13 @@ public class ApprovalInstance extends BaseEntity {
     private Long businessId;
 
     /**
+     * 申请人ID
+     */
+    @Comment("申请人ID")
+    @Column(name = "applicant_id")
+    private Long applicantId;
+
+    /**
      * 流程ID
      */
     @ManyToOne
