@@ -13,56 +13,41 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * 请假申请仓库
+ * 请假申请仓库。
  */
 @Repository
 public interface LeaveApplicationRepository extends JpaRepository<LeaveApplication, Long>, JpaSpecificationExecutor<LeaveApplication> {
 
     /**
-     * 根据申请人ID分页查询
+     * 根据申请人ID分页查询。
+     *
+     * @param applicantId 申请人ID
+     * @param pageable 分页参数
+     * @return 分页结果
      */
     Page<LeaveApplication> findByApplicantIdAndDeletedFalseOrderByCreateTimeDesc(Long applicantId, Pageable pageable);
 
     /**
-     * 根据审批人ID分页查询
-     */
-    Page<LeaveApplication> findByApproverIdAndDeletedFalseOrderByCreateTimeDesc(Long approverId, Pageable pageable);
-
-    /**
-     * 根据审批状态查询
-     */
-    Page<LeaveApplication> findByApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(String approvalStatus, Pageable pageable);
-
-    /**
-     * 根据请假类型查询
-     */
-    Page<LeaveApplication> findByLeaveTypeAndDeletedFalseOrderByCreateTimeDesc(String leaveType, Pageable pageable);
-
-    /**
-     * 查询指定日期范围内的请假申请
+     * 查询指定日期范围内有交集的请假申请。
+     *
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @return 重叠的请假申请列表
      */
     @Query("SELECT la FROM LeaveApplication la WHERE la.startDate <= :endDate AND la.endDate >= :startDate AND la.deleted = false")
-    List<LeaveApplication> findOverlappingLeaves(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
-
-    Page<LeaveApplication> findByApprovalStatusAndApproverIdAndDeletedFalseOrderByCreateTimeDesc(String approvalStatus, Long approverId, Pageable pageable);
-
-    /**
-     * 根据申请人ID和审批状态查询
-     */
-    Page<LeaveApplication> findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(Long applicantId, String approvalStatus, Pageable pageable);
+    List<LeaveApplication> findOverlappingLeaves(@Param("startDate") LocalDate startDate,
+                                                 @Param("endDate") LocalDate endDate);
 
     /**
-     * 根据审批人ID和审批状态查询
+     * 根据申请人ID和审批状态分页查询。
+     *
+     * @param applicantId 申请人ID
+     * @param approvalStatus 审批状态
+     * @param pageable 分页参数
+     * @return 分页结果
      */
-    Page<LeaveApplication> findByApproverIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(Long approverId, String approvalStatus, Pageable pageable);
+    Page<LeaveApplication> findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(Long applicantId,
+                                                                                                   String approvalStatus,
+                                                                                                   Pageable pageable);
 
-    /**
-     * 根据ID列表和审批状态查询
-     */
-    Page<LeaveApplication> findAllByIdInAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(List<Long> ids, String approvalStatus, Pageable pageable);
-
-    /**
-     * 根据审批人ID和审批状态列表查询
-     */
-    Page<LeaveApplication> findByApproverIdAndApprovalStatusInAndDeletedFalseOrderByApprovalTimeDesc(Long approverId, List<String> approvalStatuses, Pageable pageable);
 }

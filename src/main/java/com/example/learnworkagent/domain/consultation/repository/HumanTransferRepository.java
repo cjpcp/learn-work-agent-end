@@ -20,25 +20,10 @@ public interface HumanTransferRepository extends JpaRepository<HumanTransfer, Lo
     Page<HumanTransfer> findByUserIdAndDeletedFalseOrderByCreateTimeDesc(Long userId, Pageable pageable);
 
     /**
-     * 根据工作人员ID分页查询
-     */
-    Page<HumanTransfer> findByStaffIdAndDeletedFalseOrderByCreateTimeDesc(Long staffId, Pageable pageable);
-
-    /**
-     * 根据工作人员ID和状态列表分页查询
-     */
-    Page<HumanTransfer> findByStaffIdAndStatusInAndDeletedFalseOrderByCreateTimeDesc(Long staffId, java.util.List<String> statusList, Pageable pageable);
-
-    /**
      * 根据状态分页查询
      */
     Page<HumanTransfer> findByStatusInAndDeletedFalseOrderByCreateTimeDesc(List<String> status, Pageable pageable);
 
-    /**
-     * 根据问题ID查询
-     */
-    HumanTransfer findByQuestionIdAndDeletedFalse(Long questionId);
-    
     /**
      * 根据工作人员ID和状态查询已完成的记录
      */

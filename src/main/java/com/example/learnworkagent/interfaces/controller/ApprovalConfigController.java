@@ -1,6 +1,8 @@
 package com.example.learnworkagent.interfaces.controller;
 
 import com.example.learnworkagent.common.Result;
+import com.example.learnworkagent.common.ResultCode;
+import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.domain.approval.entity.ApprovalProcess;
 import com.example.learnworkagent.domain.approval.entity.ApprovalStep;
 import com.example.learnworkagent.domain.approval.repository.ApprovalProcessRepository;
@@ -40,10 +42,7 @@ public class ApprovalConfigController extends BaseController {
     @Operation(summary = "创建审批流程")
     @PostMapping("/processes")
     public Result<?> createProcess(@Valid @RequestBody ApprovalProcess process) {
-        // 设置name字段为processName的值，确保两个字段一致
-        process.setName(process.getProcessName());
-        // 设置type字段为processType的值，确保两个字段一致
-        process.setType(process.getProcessType());
+        process.syncCompatibleFields();
         return Result.success(processRepository.save(process));
     }
 
@@ -53,11 +52,9 @@ public class ApprovalConfigController extends BaseController {
     @Operation(summary = "更新审批流程")
     @PutMapping("/processes/{id}")
     public Result<?> updateProcess(@PathVariable Long id, @Valid @RequestBody ApprovalProcess process) {
+        requireProcess(id);
         process.setId(id);
-        // 设置name字段为processName的值，确保两个字段一致
-        process.setName(process.getProcessName());
-        // 设置type字段为processType的值，确保两个字段一致
-        process.setType(process.getProcessType());
+        process.syncCompatibleFields();
         return Result.success(processRepository.save(process));
     }
 
@@ -67,14 +64,10 @@ public class ApprovalConfigController extends BaseController {
     @Operation(summary = "删除审批流程")
     @DeleteMapping("/processes/{id}")
     public Result<?> deleteProcess(@PathVariable Long id) {
-        // 先删除关联的审批步骤
-        ApprovalProcess process = processRepository.findById(id).orElse(null);
-        if (process != null) {
-            List<ApprovalStep> steps = stepRepository.findByProcessOrderByStepOrderAsc(process);
-            stepRepository.deleteAll(steps);
-        }
-        // 再删除审批流程
-        processRepository.deleteById(id);
+        ApprovalProcess process = requireProcess(id);
+        List<ApprovalStep> steps = stepRepository.findByProcessOrderByStepOrderAsc(process);
+        stepRepository.deleteAll(steps);
+        processRepository.delete(process);
         return Result.success();
     }
 
@@ -84,10 +77,7 @@ public class ApprovalConfigController extends BaseController {
     @Operation(summary = "获取流程的审批步骤")
     @GetMapping("/processes/{processId}/steps")
     public Result<?> getSteps(@PathVariable Long processId) {
-        ApprovalProcess process = processRepository.findById(processId).orElse(null);
-        if (process == null) {
-            return Result.fail("流程不存在");
-        }
+        ApprovalProcess process = requireProcess(processId);
         return Result.success(stepRepository.findByProcessOrderByStepOrderAsc(process));
     }
 
@@ -97,12 +87,7 @@ public class ApprovalConfigController extends BaseController {
     @Operation(summary = "添加审批步骤")
     @PostMapping("/steps")
     public Result<?> addStep(@Valid @RequestBody ApprovalStep step) {
-        // 设置name字段为stepName的值，确保两个字段一致
-        step.setName(step.getStepName());
-        // 设置approverType字段为approverRole的值，确保两个字段一致
-        step.setApproverType(step.getApproverRole());
-        // 设置orderIndex字段为stepOrder的值，确保两个字段一致
-        step.setOrderIndex(step.getStepOrder());
+        syncStepCompatibleFields(step);
         return Result.success(stepRepository.save(step));
     }
 
@@ -112,13 +97,9 @@ public class ApprovalConfigController extends BaseController {
     @Operation(summary = "更新审批步骤")
     @PutMapping("/steps/{id}")
     public Result<?> updateStep(@PathVariable Long id, @Valid @RequestBody ApprovalStep step) {
+        requireStep(id);
         step.setId(id);
-        // 设置name字段为stepName的值，确保两个字段一致
-        step.setName(step.getStepName());
-        // 设置approverType字段为approverRole的值，确保两个字段一致
-        step.setApproverType(step.getApproverRole());
-        // 设置orderIndex字段为stepOrder的值，确保两个字段一致
-        step.setOrderIndex(step.getStepOrder());
+        syncStepCompatibleFields(step);
         return Result.success(stepRepository.save(step));
     }
 
@@ -138,11 +119,8 @@ public class ApprovalConfigController extends BaseController {
     @Operation(summary = "启用流程")
     @PostMapping("/processes/{id}/enable")
     public Result<?> enableProcess(@PathVariable Long id) {
-        ApprovalProcess process = processRepository.findById(id).orElse(null);
-        if (process == null) {
-            return Result.fail("流程不存在");
-        }
-        process.setEnabled(true);
+        ApprovalProcess process = requireProcess(id);
+        process.enable();
         return Result.success(processRepository.save(process));
     }
 
@@ -152,11 +130,24 @@ public class ApprovalConfigController extends BaseController {
     @Operation(summary = "禁用流程")
     @PostMapping("/processes/{id}/disable")
     public Result<?> disableProcess(@PathVariable Long id) {
-        ApprovalProcess process = processRepository.findById(id).orElse(null);
-        if (process == null) {
-            return Result.fail("流程不存在");
-        }
-        process.setEnabled(false);
+        ApprovalProcess process = requireProcess(id);
+        process.disable();
         return Result.success(processRepository.save(process));
+    }
+
+    private void syncStepCompatibleFields(ApprovalStep step) {
+        step.setName(step.getStepName());
+        step.setApproverType(step.getApproverRole());
+        step.setOrderIndex(step.getStepOrder());
+    }
+
+    private ApprovalProcess requireProcess(Long processId) {
+        return processRepository.findById(processId)
+                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "流程不存在: " + processId));
+    }
+
+    private void requireStep(Long stepId) {
+        stepRepository.findById(stepId)
+                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "审批步骤不存在: " + stepId));
     }
 }

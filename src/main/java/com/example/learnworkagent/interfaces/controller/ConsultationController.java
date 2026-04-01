@@ -362,8 +362,7 @@ public class ConsultationController extends BaseController {
     @Operation(summary = "分页查询工作人员的转接记录")
     @GetMapping("/transfers/staff")
     public Result<PageResult<HumanTransfer>> getStaffTransfers(@Valid PageRequest pageRequest) {
-        Long staffId = getCurrentUserId();
-        PageResult<HumanTransfer> result = humanTransferService.getStaffTransfers(staffId, pageRequest);
+        PageResult<HumanTransfer> result = humanTransferService.getStaffTransfers(pageRequest);
         return Result.success(result);
     }
 

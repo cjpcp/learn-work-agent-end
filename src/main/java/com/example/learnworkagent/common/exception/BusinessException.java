@@ -3,17 +3,22 @@ package com.example.learnworkagent.common.exception;
 import com.example.learnworkagent.common.ResultCode;
 import lombok.Getter;
 
+import java.io.Serial;
+
 /**
- * 业务异常
+ * 业务异常。
+ * 用于承载可预期的业务失败场景，便于统一异常处理。
  */
 @Getter
 public class BusinessException extends RuntimeException {
 
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private final Integer code;
 
     public BusinessException(String message) {
-        super(message);
-        this.code = ResultCode.FAIL.getCode();
+        this(ResultCode.FAIL, message);
     }
 
     public BusinessException(Integer code, String message) {
@@ -22,8 +27,7 @@ public class BusinessException extends RuntimeException {
     }
 
     public BusinessException(ResultCode resultCode) {
-        super(resultCode.getMessage());
-        this.code = resultCode.getCode();
+        this(resultCode, resultCode.getMessage());
     }
 
     public BusinessException(ResultCode resultCode, String message) {

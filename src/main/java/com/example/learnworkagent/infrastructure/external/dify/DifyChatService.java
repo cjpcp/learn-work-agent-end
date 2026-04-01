@@ -188,18 +188,4 @@ public class DifyChatService {
         return "document";
     }
 
-    /**
-     * 从文件输入列表中提取URL列表
-     *
-     * @param fileInputs 文件输入列表
-     * @return URL列表
-     */
-    public List<String> extractFileUrls(List<com.example.learnworkagent.domain.consultation.dto.DifyConsultationRequest.FileInput> fileInputs) {
-        if (fileInputs == null || fileInputs.isEmpty()) {
-            return null;
-        }
-        return fileInputs.stream()
-                .map(com.example.learnworkagent.domain.consultation.dto.DifyConsultationRequest.FileInput::getUrl)
-                .toList();
-    }
 }

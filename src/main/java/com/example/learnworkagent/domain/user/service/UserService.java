@@ -1,6 +1,5 @@
 package com.example.learnworkagent.domain.user.service;
 
-import com.example.learnworkagent.common.enums.RoleEnum;
 import com.example.learnworkagent.domain.user.entity.User;
 
 import java.util.List;

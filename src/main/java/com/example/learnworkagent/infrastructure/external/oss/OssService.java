@@ -8,6 +8,7 @@ import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -53,27 +54,7 @@ public class OssService {
 
         try {
             // 生成唯一文件名
-            String originalFilename = file.getOriginalFilename();
-            String fileExtension;
-            if (originalFilename != null && originalFilename.lastIndexOf(".") >= 0) {
-                fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            } else {
-                // 无扩展名时从 ContentType 推断
-                String contentType = file.getContentType();
-                if (contentType != null) {
-                    if (contentType.contains("webm")) fileExtension = ".webm";
-                    else if (contentType.contains("ogg")) fileExtension = ".ogg";
-                    else if (contentType.contains("wav")) fileExtension = ".wav";
-                    else if (contentType.contains("mp3") || contentType.contains("mpeg")) fileExtension = ".mp3";
-                    else if (contentType.contains("jpeg") || contentType.contains("jpg")) fileExtension = ".jpg";
-                    else if (contentType.contains("png")) fileExtension = ".png";
-                    else if (contentType.contains("gif")) fileExtension = ".gif";
-                    else if (contentType.contains("pdf")) fileExtension = ".pdf";
-                    else fileExtension = "";
-                } else {
-                    fileExtension = "";
-                }
-            }
+            String fileExtension = getFileExtension(file);
             String fileName = folder + "/" + UUID.randomUUID() + fileExtension;
 
             // 创建OSS客户端
@@ -113,15 +94,29 @@ public class OssService {
         }
     }
 
-    /**
-     * 上传奖助申请相关文件
-     *
-     * @param file   上传的文件
-     * @param userId 用户ID
-     * @return 文件在OSS上的URL
-     */
-    public String uploadAwardFile(MultipartFile file, Long userId) {
-        return uploadFile(file, "award-applications/" + userId);
+    private static @NotNull String getFileExtension(MultipartFile file) {
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension;
+        if (originalFilename != null && originalFilename.lastIndexOf(".") >= 0) {
+            fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        } else {
+            // 无扩展名时从 ContentType 推断
+            String contentType = file.getContentType();
+            if (contentType != null) {
+                if (contentType.contains("webm")) fileExtension = ".webm";
+                else if (contentType.contains("ogg")) fileExtension = ".ogg";
+                else if (contentType.contains("wav")) fileExtension = ".wav";
+                else if (contentType.contains("mp3") || contentType.contains("mpeg")) fileExtension = ".mp3";
+                else if (contentType.contains("jpeg") || contentType.contains("jpg")) fileExtension = ".jpg";
+                else if (contentType.contains("png")) fileExtension = ".png";
+                else if (contentType.contains("gif")) fileExtension = ".gif";
+                else if (contentType.contains("pdf")) fileExtension = ".pdf";
+                else fileExtension = "";
+            } else {
+                fileExtension = "";
+            }
+        }
+        return fileExtension;
     }
 
     /**

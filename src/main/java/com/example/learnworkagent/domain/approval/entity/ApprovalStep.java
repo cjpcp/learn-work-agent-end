@@ -1,6 +1,7 @@
 package com.example.learnworkagent.domain.approval.entity;
 
 import com.example.learnworkagent.common.BaseEntity;
+import com.example.learnworkagent.common.enums.RoleEnum;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Comment;
 import lombok.Data;
@@ -15,6 +16,9 @@ import lombok.EqualsAndHashCode;
 @Comment("审批步骤表")
 @Table(name = "approval_stage")
 public class ApprovalStep extends BaseEntity {
+
+    private static final String APPROVAL_TYPE_SINGLE = "SINGLE";
+    private static final String APPROVAL_TYPE_MULTIPLE = "MULTIPLE";
 
     /**
      * 流程ID
@@ -93,4 +97,36 @@ public class ApprovalStep extends BaseEntity {
     @Comment("部门ID（用于部门领导审批步骤筛选）")
     @Column(name = "department_id")
     private Long departmentId;
+
+    public boolean isSingleApproval() {
+        return APPROVAL_TYPE_SINGLE.equals(approvalType);
+    }
+
+    public boolean isMultipleApproval() {
+        return APPROVAL_TYPE_MULTIPLE.equals(approvalType);
+    }
+
+    public boolean requiresAllPass() {
+        return Boolean.TRUE.equals(mustPass);
+    }
+
+    public boolean allowsRejectContinue() {
+        return isMultipleApproval() && Boolean.FALSE.equals(mustPass);
+    }
+
+    public boolean isCounselorStep() {
+        return RoleEnum.COUNSELOR.getCode().equals(approverRole);
+    }
+
+    public boolean isCollegeLeaderStep() {
+        return RoleEnum.COLLEGE_LEADER.getCode().equals(approverRole);
+    }
+
+    public boolean isDepartmentLeaderStep() {
+        return RoleEnum.DEPARTMENT_LEADER.getCode().equals(approverRole);
+    }
+
+    public boolean hasAssignedApprover() {
+        return approverUserId != null;
+    }
 }

@@ -1,6 +1,5 @@
 package com.example.learnworkagent.domain.user.repository;
 
-import com.example.learnworkagent.common.enums.RoleEnum;
 import com.example.learnworkagent.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

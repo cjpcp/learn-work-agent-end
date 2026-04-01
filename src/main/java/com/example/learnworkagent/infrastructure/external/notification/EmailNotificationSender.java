@@ -1,5 +1,10 @@
 package com.example.learnworkagent.infrastructure.external.notification;
 
+import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
+import com.example.learnworkagent.common.enums.AwardApplicationTypeEnum;
+import com.example.learnworkagent.common.enums.NotificationBusinessTypeEnum;
+import com.example.learnworkagent.common.enums.NotificationChannelEnum;
+import com.example.learnworkagent.common.enums.NotificationTypeEnum;
 import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
 import com.example.learnworkagent.domain.notification.service.NotificationSender;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +29,12 @@ import java.time.format.DateTimeFormatter;
 public class EmailNotificationSender implements NotificationSender {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final String CHANNEL_EMAIL = NotificationChannelEnum.EMAIL.getCode();
+    private static final String BUSINESS_TYPE_LEAVE = NotificationBusinessTypeEnum.LEAVE.getCode();
+    private static final String NOTIFICATION_TYPE_APPROVAL_RESULT = NotificationTypeEnum.APPROVAL_RESULT.getCode();
+    private static final String APPLICATION_TYPE_SCHOLARSHIP = AwardApplicationTypeEnum.SCHOLARSHIP.getCode();
+    private static final String APPLICATION_TYPE_GRANT = AwardApplicationTypeEnum.GRANT.getCode();
+    private static final String APPLICATION_TYPE_SUBSIDY = AwardApplicationTypeEnum.SUBSIDY.getCode();
 
     private final JavaMailSender mailSender;
 
@@ -35,7 +46,7 @@ public class EmailNotificationSender implements NotificationSender {
 
     @Override
     public String getChannel() {
-        return "EMAIL";
+        return CHANNEL_EMAIL;
     }
 
     @Override
@@ -129,8 +140,9 @@ public class EmailNotificationSender implements NotificationSender {
 
     private String buildApprovalResultEmailContent(NotificationMessage message) {
         String accent = resolveAccent(message);
-        String status = "APPROVED".equals(message.getApprovalStatus()) ? "已通过" : "未通过";
-        String statusClass = "APPROVED".equals(message.getApprovalStatus()) ? "ok" : "bad";
+        boolean approved = ApprovalStatusEnum.APPROVED.getCode().equals(message.getApprovalStatus());
+        String status = approved ? "已通过" : "未通过";
+        String statusClass = approved ? "ok" : "bad";
 
         String template = """
                 <!DOCTYPE html>
@@ -199,11 +211,11 @@ public class EmailNotificationSender implements NotificationSender {
     }
 
     private boolean isPendingApprovalMail(NotificationMessage message) {
-        return !"APPROVAL_RESULT".equals(message.getType());
+        return !NOTIFICATION_TYPE_APPROVAL_RESULT.equals(message.getType());
     }
 
     private String detail(NotificationMessage message, String accent, String status, String statusClass) {
-        if ("LEAVE".equals(message.getBusinessType())) {
+        if (BUSINESS_TYPE_LEAVE.equals(message.getBusinessType())) {
             return panel("请假审批详情", accent,
                     row("申请人", defaultText(message.getApplicantName(), "-")) +
                     row("请假类型", defaultText(message.getAwardName(), "请假申请")) +
@@ -229,7 +241,7 @@ public class EmailNotificationSender implements NotificationSender {
     }
 
     private String pendingDetail(NotificationMessage message, String accent) {
-        if ("LEAVE".equals(message.getBusinessType())) {
+        if (BUSINESS_TYPE_LEAVE.equals(message.getBusinessType())) {
             return panel("待审批请假任务", accent,
                     row("申请人", defaultText(message.getApplicantName(), "-")) +
                     row("请假类型", defaultText(message.getAwardName(), "请假申请")) +
@@ -257,44 +269,60 @@ public class EmailNotificationSender implements NotificationSender {
     }
 
     private String summary(NotificationMessage message) {
-        if ("LEAVE".equals(message.getBusinessType())) {
+        if (BUSINESS_TYPE_LEAVE.equals(message.getBusinessType())) {
             return "请假申请结果已更新，系统已为您整理审批状态与处理意见。";
         }
-        return switch (message.getApplicationType()) {
-            case "SCHOLARSHIP" -> "奖学金申请结果已更新，请及时查看评审与审批反馈。";
-            case "GRANT" -> "助学金申请结果已更新，请及时查看审核与审批反馈。";
-            case "SUBSIDY" -> "困难补助申请结果已更新，请及时查看审核与审批反馈。";
-            default -> "您的申请结果已更新，请及时查看审批详情。";
-        };
+
+        String applicationType = message.getApplicationType();
+        if (APPLICATION_TYPE_SCHOLARSHIP.equals(applicationType)) {
+            return "奖学金申请结果已更新，请及时查看评审与审批反馈。";
+        }
+        if (APPLICATION_TYPE_GRANT.equals(applicationType)) {
+            return "助学金申请结果已更新，请及时查看审核与审批反馈。";
+        }
+        if (APPLICATION_TYPE_SUBSIDY.equals(applicationType)) {
+            return "困难补助申请结果已更新，请及时查看审核与审批反馈。";
+        }
+        return "您的申请结果已更新，请及时查看审批详情。";
     }
 
     private String resolveAccent(NotificationMessage message) {
-        if ("LEAVE".equals(message.getBusinessType())) {
+        if (BUSINESS_TYPE_LEAVE.equals(message.getBusinessType())) {
             return "leave";
         }
-        return switch (message.getApplicationType()) {
-            case "SCHOLARSHIP" -> "scholarship";
-            case "GRANT", "SUBSIDY" -> "grant";
-            default -> "grant";
-        };
+
+        String applicationType = message.getApplicationType();
+        if (APPLICATION_TYPE_SCHOLARSHIP.equals(applicationType)) {
+            return "scholarship";
+        }
+        return "grant";
     }
 
     private String panelTitle(NotificationMessage message) {
-        return switch (message.getApplicationType()) {
-            case "SCHOLARSHIP" -> "奖学金审批详情";
-            case "GRANT" -> "助学金审批详情";
-            case "SUBSIDY" -> "困难补助审批详情";
-            default -> "奖助审批详情";
-        };
+        String applicationType = message.getApplicationType();
+        if (APPLICATION_TYPE_SCHOLARSHIP.equals(applicationType)) {
+            return "奖学金审批详情";
+        }
+        if (APPLICATION_TYPE_GRANT.equals(applicationType)) {
+            return "助学金审批详情";
+        }
+        if (APPLICATION_TYPE_SUBSIDY.equals(applicationType)) {
+            return "困难补助审批详情";
+        }
+        return "奖助审批详情";
     }
 
     private String awardType(String type) {
-        return switch (type) {
-            case "SCHOLARSHIP" -> "奖学金申请";
-            case "GRANT" -> "助学金申请";
-            case "SUBSIDY" -> "困难补助申请";
-            default -> "奖助申请";
-        };
+        if (APPLICATION_TYPE_SCHOLARSHIP.equals(type)) {
+            return "奖学金申请";
+        }
+        if (APPLICATION_TYPE_GRANT.equals(type)) {
+            return "助学金申请";
+        }
+        if (APPLICATION_TYPE_SUBSIDY.equals(type)) {
+            return "困难补助申请";
+        }
+        return "奖助申请";
     }
 
     private String amount(BigDecimal amount) {

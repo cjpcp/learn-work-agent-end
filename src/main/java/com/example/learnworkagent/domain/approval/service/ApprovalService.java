@@ -10,13 +10,13 @@ public interface ApprovalService {
 
     /**
      * 为业务创建审批流程实例
-     * @param businessType 业务类型
-     * @param businessId 业务ID
-     * @param applicantId 申请人ID
+     *
+     * @param businessType  业务类型
+     * @param businessId    业务ID
+     * @param applicantId   申请人ID
      * @param applicantInfo 申请人信息（JSON格式）
-     * @return 审批实例
      */
-    ApprovalInstance createApprovalInstance(String businessType, Long businessId, Long applicantId, String applicantInfo);
+    void createApprovalInstance(String businessType, Long businessId, Long applicantId, String applicantInfo);
 
     /**
      * 处理审批任务

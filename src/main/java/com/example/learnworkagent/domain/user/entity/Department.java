@@ -39,7 +39,7 @@ public class Department extends BaseEntity {
      * 部门描述
      */
     @Comment("部门描述")
-    @Column(name = "description", length = 255)
+    @Column(name = "description")
     private String description;
 
     /**

@@ -1,9 +1,11 @@
 package com.example.learnworkagent.domain.award.service;
 
+import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
+import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
+import com.example.learnworkagent.common.enums.NotificationBusinessTypeEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
-import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
 import com.example.learnworkagent.domain.approval.service.ApprovalService;
@@ -24,7 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * 奖助申请服务
@@ -33,6 +39,15 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class AwardApplicationService {
+
+    private static final String BUSINESS_TYPE_AWARD = NotificationBusinessTypeEnum.AWARD.getCode();
+    private static final String SORT_FIELD_CREATE_TIME = "createTime";
+    private static final String MATERIAL_STATUS_PENDING = "PENDING";
+    private static final String MATERIAL_STATUS_PASSED = "PASSED";
+    private static final String MATERIAL_STATUS_FAILED = "FAILED";
+    private static final String MATERIAL_COMMENT_PASSED = "材料完整，通过预审";
+    private static final String MATERIAL_COMMENT_FAILED = "材料不完整，请补充相关材料";
+    private static final Duration MATERIAL_CHECK_TIMEOUT = Duration.ofSeconds(30);
 
     private final AwardApplicationRepository awardApplicationRepository;
     private final DifyWorkflowService difyWorkflowService;
@@ -47,43 +62,11 @@ public class AwardApplicationService {
         log.info("提交申请，用户ID: {}, 申请类型: {}, 奖项名称: {}, 金额: {}, 理由: {}",
                 applicantId, request.getApplicationType(), request.getAwardName(), request.getAmount(), request.getReason());
 
-        // 创建申请并保存
-        AwardApplication application = new AwardApplication();
-        application.setApplicantId(applicantId);
-        application.setApplicationType(request.getApplicationType());
-        application.setAwardName(request.getAwardName());
-        application.setAmount(request.getAmount());
-        application.setReason(request.getReason());
-        application.setAttachmentUrls(request.getAttachmentUrls() != null ? String.join(",", request.getAttachmentUrls()) : null);
-        application.setMaterialStatus("PENDING");
-        application.setApprovalStatus("PENDING");
-        application.setStudentName(request.getStudentName());
-        application.setDepartmentId(request.getDepartmentId());
-        application.setGrade(request.getGrade());
-        application.setClassName(request.getClassName());
-
-        AwardApplication saved = awardApplicationRepository.save(application);
-
-        // 异步进行材料预审
-        preCheckMaterialsAsync(saved.getId());
-
-        // 创建审批流程实例
-        try {
-            HashMap<String, Object> applicantInfo = new HashMap<>();
-            applicantInfo.put("departmentId", request.getDepartmentId());
-            applicantInfo.put("grade", request.getGrade());
-            applicantInfo.put("className", request.getClassName());
-            applicantInfo.put("studentName", request.getStudentName());
-            applicantInfo.put("applicationType", request.getApplicationType());
-
-            String applicantInfoJson = objectMapper.writeValueAsString(applicantInfo);
-            approvalService.createApprovalInstance("AWARD", saved.getId(), applicantId, applicantInfoJson);
-        } catch (Exception e) {
-            log.error("创建审批流程失败", e);
-            // 审批流程创建失败不影响申请提交
-        }
-
-        return saved;
+        AwardApplication application = buildAwardApplication(applicantId, request);
+        AwardApplication savedApplication = awardApplicationRepository.save(application);
+        preCheckMaterialsAsync(savedApplication.getId());
+        createApprovalFlow(savedApplication, applicantId, request);
+        return savedApplication;
     }
 
     /**
@@ -94,168 +77,36 @@ public class AwardApplicationService {
     @Async
     public void preCheckMaterialsAsync(Long applicationId) {
         try {
-            AwardApplication application = awardApplicationRepository.findById(applicationId)
-                    .orElseThrow(() -> new BusinessException(ResultCode.AWARD_APPLICATION_NOT_FOUND));
-
-            // 检查材料完整性
+            AwardApplication application = getApplicationById(applicationId);
             boolean materialsComplete = checkMaterialsComplete(application);
-
-            //根据检查结果更新申请预审状态，预审意见和预审时间
-            application.setMaterialStatus(materialsComplete ? "PASSED" : "FAILED");
-            application.setMaterialComment(materialsComplete ? "材料完整，通过预审" : "材料不完整，请补充相关材料");
-            application.setMaterialReviewTime(LocalDateTime.now());
-
+            applyMaterialReviewResult(application, materialsComplete);
             awardApplicationRepository.save(application);
-        } catch (Exception e) {
-            log.error("材料预审失败，申请ID: {}", applicationId, e);
+        } catch (Exception exception) {
+            log.error("材料预审失败，申请ID: {}", applicationId, exception);
         }
-    }
-
-    /**
-     * 检查材料完整性
-     *
-     * @param application 具体的奖助学金申请
-     * @return 材料是否完整
-     */
-    private boolean checkMaterialsComplete(AwardApplication application) {
-        // 基础检查：必须有申请理由和附件
-        if (application.getReason() == null || application.getReason().trim().isEmpty()) {
-            return false;
-        }
-
-        if (application.getAttachmentUrls() == null || application.getAttachmentUrls().trim().isEmpty()) {
-            return false;
-        }
-
-        // 将附件URL转换为列表
-        List<String> fileUrls = Arrays.stream(application.getAttachmentUrls().split(","))
-                .map(String::trim)
-                .filter(url -> !url.isEmpty())
-                .toList();
-
-        if (fileUrls.isEmpty()) {
-            return false;
-        }
-
-        // 使用Dify工作流识别所有文件
-        try {
-            Map<String, Object> result = difyWorkflowService.identifyDocuments(fileUrls)
-                    .block(Duration.ofSeconds(30));
-
-            log.info("Dify工作流识别结果: {}", result);
-
-            // 根据申请类型检查必需材料
-            String applicationType = application.getApplicationType();
-            //todo
-            if ("SCHOLARSHIP".equals(applicationType)) {
-                // 奖学金需要成绩单、推荐信等
-                return checkScholarshipMaterials(result);
-            } else if ("GRANT".equals(applicationType) || "SUBSIDY".equals(applicationType)) {
-                return checkGrantMaterials(result);
-            }
-
-            return true;
-        } catch (Exception e) {
-            log.error("Dify工作流识别失败", e);
-            return false;
-        }
-    }
-
-    /**
-     * 检查奖学金材料是否提供
-     *
-     * @param result Dify工作流识别结果
-     * @return 是否提供
-     */
-    private boolean checkScholarshipMaterials(Map<String, Object> result) {
-        // 解析Dify工作流的识别结果
-        // 这里需要根据实际的Dify工作流输出格式进行调整
-        boolean hasTranscript = false;
-        boolean hasRecommendation = false;
-
-        // 示例：假设Dify工作流返回的结果中包含识别出的文档类型
-        if (result != null) {
-            // 具体的解析逻辑需要根据Dify工作流的实际输出格式调整
-            // 这里是一个示例实现
-            Object output = result.get("output");
-            if (output != null) {
-                String outputStr = output.toString().toLowerCase();
-                hasTranscript = outputStr.contains("成绩单");
-                hasRecommendation = outputStr.contains("推荐信");
-            }
-        }
-
-        log.info("奖学金材料检查结果 - 成绩单: {}, 推荐信: {}", hasTranscript, hasRecommendation);
-        return hasTranscript && hasRecommendation;
-    }
-
-    /**
-     * 检查助学金材料是否提供
-     *
-     * @param result Dify工作流识别结果
-     * @return 是否提供
-     */
-    private boolean checkGrantMaterials(Map<String, Object> result) {
-        // 解析Dify工作流的识别结果
-        // 这里需要根据实际的Dify工作流输出格式进行调整
-        boolean hasFamilyProof = false;
-        boolean hasIncomeProof = false;
-
-        // 示例：假设Dify工作流返回的结果中包含识别出的文档类型
-        if (result != null) {
-            // 具体的解析逻辑需要根据Dify工作流的实际输出格式调整
-            // 这里是一个示例实现
-            Object output = result.get("output");
-            if (output != null) {
-                String outputStr = output.toString().toLowerCase();
-                hasFamilyProof = outputStr.contains("家庭情况证明");
-                hasIncomeProof = outputStr.contains("收入证明");
-            }
-        }
-
-        log.info("助学金材料检查结果 - 家庭情况证明: {}, 收入证明: {}", hasFamilyProof, hasIncomeProof);
-        return hasFamilyProof && hasIncomeProof;
     }
 
     /**
      * 审批奖助申请
      *
-     * @param applicationId   奖助申请id
-     * @param approverId      审批人id
-     * @param approvalStatus  审批状态
+     * @param applicationId 奖助申请id
+     * @param approverId 审批人id
+     * @param approvalStatus 审批状态
      * @param approvalComment 审批意见
      */
     @Transactional
     public void approveAwardApplication(Long applicationId, Long approverId,
                                         String approvalStatus, String approvalComment) {
-        AwardApplication application = awardApplicationRepository.findById(applicationId)
-                .orElseThrow(() -> new BusinessException(ResultCode.AWARD_APPLICATION_NOT_FOUND));
+        AwardApplication application = getApplicationById(applicationId);
 
-        if (!"PASSED".equals(application.getMaterialStatus())) {
+        if (!MATERIAL_STATUS_PASSED.equals(application.getMaterialStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "材料预审未通过，无法审批");
         }
 
-        ApprovalInstance approvalInstance = approvalService.getApprovalInstance("AWARD", applicationId);
+        ApprovalInstance approvalInstance = approvalService.getApprovalInstance(BUSINESS_TYPE_AWARD, applicationId);
         ApprovalTask currentTask = getCurrentTask(approvalInstance, approverId);
-
         approvalService.processApprovalTask(currentTask.getId(), approverId, approvalStatus, approvalComment);
-
-        // 通知由 ApprovalServiceImpl 统一处理
     }
-
-    private ApprovalTask getCurrentTask(ApprovalInstance approvalInstance, Long approverId) {
-        if (approvalInstance == null) {
-            throw new BusinessException(ResultCode.PARAM_ERROR, "审批流程不存在");
-        }
-
-        return approvalService.getCurrentTasks(approvalInstance).stream()
-                .filter(task -> Objects.equals(task.getApproverId(), approverId))
-                .filter(task -> "PROCESSING".equals(task.getStatus()))
-                .findFirst()
-                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "当前没有可处理的审批任务"));
-    }
-
-
 
     /**
      * 获取申请详情
@@ -268,40 +119,22 @@ public class AwardApplicationService {
     /**
      * 分页查询用户的奖助申请
      *
-     * @param userId      用户id
+     * @param userId 用户id
      * @param pageRequest 分页查询参数
      * @return 奖助申请分页查询结果
      */
     public PageResult<AwardApplication> getUserApplications(Long userId, PageRequest pageRequest) {
-        //通过传入的分页参数构建Pageable对象
-        Pageable pageable = org.springframework.data.domain.PageRequest.of(
-                pageRequest.getPage(),
-                pageRequest.getPageSize(),
-                Sort.by(Sort.Direction.DESC, "createTime")
-        );
-
-        //根据userId和pageable进行分页查询
+        Pageable pageable = buildPageable(pageRequest);
         Page<AwardApplication> page = awardApplicationRepository
                 .findByApplicantIdAndDeletedFalseOrderByCreateTimeDesc(userId, pageable);
-
-        return new PageResult<>(
-                page.getContent(),
-                page.getTotalElements(),
-                pageRequest.getPageNum(),
-                pageRequest.getPageSize()
-        );
+        return buildPageResult(page, pageRequest);
     }
 
     /**
      * 分页查询待审批的申请（审批人）
      */
     public PageResult<AwardApplication> getPendingApplications(Long approverId, PageRequest pageRequest) {
-        Pageable pageable = org.springframework.data.domain.PageRequest.of(
-                pageRequest.getPage(),
-                pageRequest.getPageSize(),
-                Sort.by(Sort.Direction.DESC, "createTime")
-        );
-
+        Pageable pageable = buildPageable(pageRequest);
         List<Long> applicationIds = approvalService.getPendingTasks(approverId).stream()
                 .map(task -> task.getInstance().getBusinessId())
                 .filter(Objects::nonNull)
@@ -312,17 +145,156 @@ public class AwardApplicationService {
         if (applicationIds.isEmpty()) {
             page = Page.empty(pageable);
         } else {
-            page = awardApplicationRepository.findAll(
-                    (Specification<AwardApplication>) (root, query, cb) -> root.get("id").in(applicationIds),
-                    pageable
-            );
+            page = awardApplicationRepository.findAll(buildPendingApplicationsSpecification(applicationIds), pageable);
         }
 
+        return buildPageResult(page, pageRequest);
+    }
+
+    /**
+     * 检查材料完整性
+     *
+     * @param application 具体的奖助学金申请
+     * @return 材料是否完整
+     */
+    private boolean checkMaterialsComplete(AwardApplication application) {
+        if (isBlank(application.getReason()) || isBlank(application.getAttachmentUrls())) {
+            return false;
+        }
+
+        List<String> fileUrls = Stream.of(application.getAttachmentUrls().split(","))
+                .map(String::trim)
+                .filter(url -> !url.isEmpty())
+                .toList();
+        if (fileUrls.isEmpty()) {
+            return false;
+        }
+
+        try {
+            Map<String, Object> result = difyWorkflowService.identifyDocuments(fileUrls)
+                    .block(MATERIAL_CHECK_TIMEOUT);
+            log.info("Dify工作流识别结果: {}", result);
+            return switch (application.getApplicationType()) {
+                case "SCHOLARSHIP" -> checkScholarshipMaterials(result);
+                case "GRANT", "SUBSIDY" -> checkGrantMaterials(result);
+                default -> true;
+            };
+        } catch (Exception exception) {
+            log.error("Dify工作流识别失败", exception);
+            return false;
+        }
+    }
+
+    /**
+     * 检查奖学金材料是否提供
+     */
+    private boolean checkScholarshipMaterials(Map<String, Object> result) {
+        String output = readWorkflowOutput(result);
+        boolean hasTranscript = output.contains("成绩单");
+        boolean hasRecommendation = output.contains("推荐信");
+        log.info("奖学金材料检查结果 - 成绩单: {}, 推荐信: {}", hasTranscript, hasRecommendation);
+        return hasTranscript && hasRecommendation;
+    }
+
+    /**
+     * 检查助学金材料是否提供
+     */
+    private boolean checkGrantMaterials(Map<String, Object> result) {
+        String output = readWorkflowOutput(result);
+        boolean hasFamilyProof = output.contains("家庭情况证明");
+        boolean hasIncomeProof = output.contains("收入证明");
+        log.info("助学金材料检查结果 - 家庭情况证明: {}, 收入证明: {}", hasFamilyProof, hasIncomeProof);
+        return hasFamilyProof && hasIncomeProof;
+    }
+
+    private AwardApplication buildAwardApplication(Long applicantId, AwardApplicationRequest request) {
+        AwardApplication application = new AwardApplication();
+        application.setApplicantId(applicantId);
+        application.setApplicationType(request.getApplicationType());
+        application.setAwardName(request.getAwardName());
+        application.setAmount(request.getAmount());
+        application.setReason(request.getReason());
+        application.setAttachmentUrls(buildAttachmentUrls(request));
+        application.setMaterialStatus(MATERIAL_STATUS_PENDING);
+        application.setApprovalStatus(ApprovalStatusEnum.PENDING.getCode());
+        application.setStudentName(request.getStudentName());
+        application.setDepartmentId(request.getDepartmentId());
+        application.setGrade(request.getGrade());
+        application.setClassName(request.getClassName());
+        return application;
+    }
+
+    private String buildAttachmentUrls(AwardApplicationRequest request) {
+        return request.getAttachmentUrls() == null ? null : String.join(",", request.getAttachmentUrls());
+    }
+
+    private void createApprovalFlow(AwardApplication application, Long applicantId, AwardApplicationRequest request) {
+        try {
+            String applicantInfoJson = objectMapper.writeValueAsString(buildApplicantInfo(request));
+            approvalService.createApprovalInstance(BUSINESS_TYPE_AWARD, application.getId(), applicantId, applicantInfoJson);
+        } catch (Exception exception) {
+            log.error("创建奖助审批流程失败，申请ID: {}", application.getId(), exception);
+        }
+    }
+
+    private Map<String, Object> buildApplicantInfo(AwardApplicationRequest request) {
+        Map<String, Object> applicantInfo = new HashMap<>(5);
+        applicantInfo.put("departmentId", request.getDepartmentId());
+        applicantInfo.put("grade", request.getGrade());
+        applicantInfo.put("className", request.getClassName());
+        applicantInfo.put("studentName", request.getStudentName());
+        applicantInfo.put("applicationType", request.getApplicationType());
+        return applicantInfo;
+    }
+
+    private void applyMaterialReviewResult(AwardApplication application, boolean materialsComplete) {
+        application.setMaterialStatus(materialsComplete ? MATERIAL_STATUS_PASSED : MATERIAL_STATUS_FAILED);
+        application.setMaterialComment(materialsComplete ? MATERIAL_COMMENT_PASSED : MATERIAL_COMMENT_FAILED);
+        application.setMaterialReviewTime(LocalDateTime.now());
+    }
+
+    private String readWorkflowOutput(Map<String, Object> result) {
+        if (result == null) {
+            return "";
+        }
+        Object output = result.get("output");
+        return output == null ? "" : output.toString().toLowerCase();
+    }
+
+    private ApprovalTask getCurrentTask(ApprovalInstance approvalInstance, Long approverId) {
+        if (approvalInstance == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "审批流程不存在");
+        }
+
+        return approvalService.getCurrentTasks(approvalInstance).stream()
+                .filter(task -> Objects.equals(task.getApproverId(), approverId))
+                .filter(task -> ApprovalStatusEnum.PROCESSING.getCode().equals(task.getStatus()))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "当前没有可处理的审批任务"));
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private Pageable buildPageable(PageRequest pageRequest) {
+        return org.springframework.data.domain.PageRequest.of(
+                pageRequest.getPage(),
+                pageRequest.getPageSize(),
+                Sort.by(Sort.Direction.DESC, SORT_FIELD_CREATE_TIME)
+        );
+    }
+
+    private PageResult<AwardApplication> buildPageResult(Page<AwardApplication> page, PageRequest pageRequest) {
         return new PageResult<>(
                 page.getContent(),
                 page.getTotalElements(),
                 pageRequest.getPageNum(),
                 pageRequest.getPageSize()
         );
+    }
+
+    private Specification<AwardApplication> buildPendingApplicationsSpecification(List<Long> applicationIds) {
+        return (root, query, criteriaBuilder) -> root.get("id").in(applicationIds);
     }
 }

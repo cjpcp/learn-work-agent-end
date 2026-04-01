@@ -17,8 +17,4 @@ public interface ApprovalProcessRepository extends JpaRepository<ApprovalProcess
      */
     Optional<ApprovalProcess> findByProcessTypeAndEnabledTrue(String processType);
 
-    /**
-     * 根据流程类型查询最新版本的流程
-     */
-    Optional<ApprovalProcess> findFirstByProcessTypeOrderByVersionDesc(String processType);
 }

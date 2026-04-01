@@ -1,6 +1,7 @@
 package com.example.learnworkagent.domain.approval.entity;
 
 import com.example.learnworkagent.common.BaseEntity;
+import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Comment;
 import lombok.Data;
@@ -59,7 +60,7 @@ public class ApprovalInstance extends BaseEntity {
      */
     @Comment("整体状态（PENDING-待审批, APPROVED-已批准, REJECTED-已拒绝, CANCELLED-已取消）")
     @Column(name = "status", nullable = false, length = 20)
-    private String status = "PENDING";
+    private String status = ApprovalStatusEnum.PENDING.getCode();
 
     /**
      * 完成时间
@@ -67,4 +68,32 @@ public class ApprovalInstance extends BaseEntity {
     @Comment("完成时间")
     @Column(name = "completed_time")
     private LocalDateTime completedTime;
+
+    public boolean isPending() {
+        return ApprovalStatusEnum.PENDING.getCode().equals(status);
+    }
+
+    public boolean isApproved() {
+        return ApprovalStatusEnum.APPROVED.getCode().equals(status);
+    }
+
+    public boolean isRejected() {
+        return ApprovalStatusEnum.REJECTED.getCode().equals(status);
+    }
+
+    public void markPending(Integer currentStep) {
+        this.status = ApprovalStatusEnum.PENDING.getCode();
+        this.currentStep = currentStep;
+        this.completedTime = null;
+    }
+
+    public void markApproved() {
+        this.status = ApprovalStatusEnum.APPROVED.getCode();
+        this.completedTime = LocalDateTime.now();
+    }
+
+    public void markRejected() {
+        this.status = ApprovalStatusEnum.REJECTED.getCode();
+        this.completedTime = LocalDateTime.now();
+    }
 }

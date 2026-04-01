@@ -141,7 +141,7 @@ public class HumanTransferService {
     /**
      * 分页查询工作人员的转接记录
      */
-    public PageResult<HumanTransfer> getStaffTransfers(Long staffId, PageRequest pageRequest) {
+    public PageResult<HumanTransfer> getStaffTransfers(PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 pageRequest.getPage(),
                 pageRequest.getPageSize(),

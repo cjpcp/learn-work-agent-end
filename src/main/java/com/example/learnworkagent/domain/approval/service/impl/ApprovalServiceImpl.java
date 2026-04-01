@@ -1,5 +1,11 @@
 package com.example.learnworkagent.domain.approval.service.impl;
 
+import com.example.learnworkagent.common.ResultCode;
+import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
+import com.example.learnworkagent.common.enums.LeaveTypeEnum;
+import com.example.learnworkagent.common.enums.NotificationBusinessTypeEnum;
+import com.example.learnworkagent.common.enums.NotificationChannelEnum;
+import com.example.learnworkagent.common.enums.NotificationTypeEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.entity.ApprovalProcess;
@@ -26,7 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -47,13 +52,21 @@ import static com.example.learnworkagent.common.enums.RoleEnum.DEPARTMENT_LEADER
 @Transactional
 public class ApprovalServiceImpl implements ApprovalService {
 
-    private static final String INSTANCE_PENDING  = "PENDING";
-    private static final String INSTANCE_APPROVED = "APPROVED";
-    private static final String INSTANCE_REJECTED = "REJECTED";
-    private static final String TASK_PENDING      = "PENDING";
-    private static final String TASK_PROCESSING   = "PROCESSING";
-    private static final String TASK_APPROVED     = "APPROVED";
-    private static final String TASK_REJECTED     = "REJECTED";
+    private static final String BUSINESS_TYPE_LEAVE = NotificationBusinessTypeEnum.LEAVE.getCode();
+    private static final String BUSINESS_TYPE_AWARD = NotificationBusinessTypeEnum.AWARD.getCode();
+    private static final List<String> DEFAULT_NOTIFICATION_CHANNELS = List.of(
+            NotificationChannelEnum.SITE.getCode(),
+            NotificationChannelEnum.EMAIL.getCode()
+    );
+
+    private static final String INSTANCE_PENDING  = ApprovalStatusEnum.PENDING.getCode();
+    private static final String INSTANCE_APPROVED = ApprovalStatusEnum.APPROVED.getCode();
+    private static final String INSTANCE_REJECTED = ApprovalStatusEnum.REJECTED.getCode();
+    private static final String TASK_PROCESSING   = ApprovalStatusEnum.PROCESSING.getCode();
+    private static final String TASK_APPROVED     = ApprovalStatusEnum.APPROVED.getCode();
+    private static final String TASK_REJECTED     = ApprovalStatusEnum.REJECTED.getCode();
+    private static final String STATUS_TEXT_APPROVED = "已通过";
+    private static final String STATUS_TEXT_REJECTED = "未通过";
 
     private final ApprovalInstanceRepository instanceRepository;
     private final ApprovalTaskRepository     taskRepository;
@@ -70,45 +83,53 @@ public class ApprovalServiceImpl implements ApprovalService {
     // =======================================================
 
     @Override
-    public ApprovalInstance createApprovalInstance(String businessType, Long businessId,
-                                                   Long applicantId, String applicantInfo) {
+    public void createApprovalInstance(String businessType, Long businessId,
+                                       Long applicantId, String applicantInfo) {
         ApprovalProcess process = processRepository.findByProcessTypeAndEnabledTrue(businessType)
-                .orElseThrow(() -> new RuntimeException("未找到启用的审批流程: " + businessType));
+                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "未找到启用的审批流程: " + businessType));
         List<ApprovalStep> steps = stepRepository.findByProcessOrderByStepOrderAsc(process);
-        if (steps.isEmpty()) throw new RuntimeException("审批流程未配置审批步骤: " + businessType);
+        if (steps.isEmpty()) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "审批流程未配置审批步骤: " + businessType);
+        }
 
         ApprovalInstance instance = new ApprovalInstance();
         instance.setBusinessType(businessType);
         instance.setBusinessId(businessId);
         instance.setApplicantId(applicantId);
         instance.setProcess(process);
-        instance.setCurrentStep(steps.get(0).getStepOrder());
-        instance.setStatus(INSTANCE_PENDING);
+        instance.markPending(steps.get(0).getStepOrder());
         instance = instanceRepository.save(instance);
 
-        for (ApprovalStep step : steps) createApprovalTasks(instance, step, applicantInfo);
+        for (ApprovalStep step : steps) {
+            createApprovalTasks(instance, step, applicantInfo);
+        }
         activateStep(instance, instance.getCurrentStep());
-        updateBusinessStatus(instance);
-        return instance;
+        updateBusinessStatus(instance, null, null);
     }
 
     @Override
     public ApprovalTask processApprovalTask(Long taskId, Long approverId, String status, String comment) {
         ApprovalTask task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("审批任务不存在: " + taskId));
-        if (!TASK_PROCESSING.equals(task.getStatus())) throw new RuntimeException("当前任务未到审批阶段或已处理");
-        if (!task.getApproverId().equals(approverId)) throw new RuntimeException("无权审批此任务");
-        if (!TASK_APPROVED.equals(status) && !TASK_REJECTED.equals(status))
-            throw new RuntimeException("无效的审批状态: " + status);
+                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "审批任务不存在: " + taskId));
+        if (!task.isProcessing()) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "当前任务未到审批阶段或已处理");
+        }
+        if (!task.getApproverId().equals(approverId)) {
+            throw new BusinessException(ResultCode.FORBIDDEN, "无权审批此任务");
+        }
+        if (!TASK_APPROVED.equals(status) && !TASK_REJECTED.equals(status)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "无效的审批状态: " + status);
+        }
 
-        task.setStatus(status);
-        task.setComment(comment);
-        task.setApprovalTime(LocalDateTime.now());
+        task.markApproved(comment);
+        if (TASK_REJECTED.equals(status)) {
+            task.markRejected(comment);
+        }
         task = taskRepository.save(task);
 
         ApprovalInstance instance = task.getInstance();
         handleStepProgress(instance, task.getStep().getStepOrder(), status, approverId, comment);
-        updateBusinessStatus(instance);
+        updateBusinessStatus(instance, approverId, comment);
         return task;
     }
 
@@ -143,15 +164,15 @@ public class ApprovalServiceImpl implements ApprovalService {
                 task.setInstance(instance);
                 task.setStep(step);
                 task.setApproverId(approvers.get(i));
-                task.setStatus(TASK_PENDING);
+                task.markPending();
                 task.setTaskOrder(i + 1);
                 taskRepository.save(task);
             }
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("创建审批任务失败", e);
-            throw new RuntimeException("创建审批任务失败", e);
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            log.error("创建审批任务失败", exception);
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "创建审批任务失败");
         }
     }
 
@@ -160,65 +181,77 @@ public class ApprovalServiceImpl implements ApprovalService {
         Object deptIdObj = data.get("departmentId");
         String grade = (String) data.get("grade");
         Long departmentId;
-        switch (step.getApproverRole()) {
-            case "COUNSELOR" -> {
-                if (deptIdObj == null) throw new BusinessException("本次申请学院id为空！");
-                if (grade == null || grade.isEmpty()) throw new BusinessException("本次申请年级为空！");
-                departmentId = Long.valueOf(deptIdObj.toString());
-                userRepository.findByDepartmentIdAndGradeAndRole(departmentId, grade, COUNSELOR.getCode())
-                        .forEach(u -> approvers.add(u.getId()));
+
+        if (step.isCounselorStep()) {
+            if (deptIdObj == null) {
+                throw new BusinessException("本次申请学院id为空！");
             }
-            case "COLLEGE_LEADER" -> {
-                if (deptIdObj == null) throw new BusinessException("本次申请学院id为空！");
-                departmentId = Long.valueOf(deptIdObj.toString());
-                userRepository.findByDepartmentIdAndRole(departmentId, COLLEGE_LEADER.getCode())
-                        .forEach(u -> approvers.add(u.getId()));
+            if (grade == null || grade.isEmpty()) {
+                throw new BusinessException("本次申请年级为空！");
             }
-            case "DEPARTMENT_LEADER" -> {
-                if (step.getApproverUserId() != null) {
-                    approvers.add(step.getApproverUserId());
-                } else {
-                    departmentId = step.getDepartmentId();
-                    if (departmentId == null) throw new BusinessException("部门领导审批，但未设置领导的部门！");
-                    userRepository.findByDepartmentIdAndRole(departmentId, DEPARTMENT_LEADER.getCode())
-                            .forEach(u -> approvers.add(u.getId()));
-                }
-            }
-            default -> throw new BusinessException("未知的审批人角色: " + step.getApproverRole());
+            departmentId = Long.valueOf(deptIdObj.toString());
+            userRepository.findByDepartmentIdAndGradeAndRole(departmentId, grade, COUNSELOR.getCode())
+                    .forEach(user -> approvers.add(user.getId()));
+            return approvers;
         }
-        return approvers;
+
+        if (step.isCollegeLeaderStep()) {
+            if (deptIdObj == null) {
+                throw new BusinessException("本次申请学院id为空！");
+            }
+            departmentId = Long.valueOf(deptIdObj.toString());
+            userRepository.findByDepartmentIdAndRole(departmentId, COLLEGE_LEADER.getCode())
+                    .forEach(user -> approvers.add(user.getId()));
+            return approvers;
+        }
+
+        if (step.isDepartmentLeaderStep()) {
+            if (step.hasAssignedApprover()) {
+                approvers.add(step.getApproverUserId());
+                return approvers;
+            }
+
+            departmentId = step.getDepartmentId();
+            if (departmentId == null) {
+                throw new BusinessException("部门领导审批，但未设置领导的部门！");
+            }
+            userRepository.findByDepartmentIdAndRole(departmentId, DEPARTMENT_LEADER.getCode())
+                    .forEach(user -> approvers.add(user.getId()));
+            return approvers;
+        }
+
+        throw new BusinessException("未知的审批人角色: " + step.getApproverRole());
     }
 
     private void handleStepProgress(ApprovalInstance instance, Integer stepOrder,
                                     String taskStatus, Long approverId, String comment) {
         List<ApprovalTask> stepTasks = taskRepository
                 .findByInstanceAndStepStepOrderOrderByTaskOrderAsc(instance, stepOrder);
-        if (stepTasks.isEmpty()) throw new RuntimeException("审批步骤任务不存在 stepOrder=" + stepOrder);
+        if (stepTasks.isEmpty()) {
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "审批步骤任务不存在 stepOrder=" + stepOrder);
+        }
         ApprovalStep step = stepTasks.get(0).getStep();
 
         if (TASK_REJECTED.equals(taskStatus) && !canContinueAfterReject(step)) {
-            instance.setStatus(INSTANCE_REJECTED);
-            instance.setCompletedTime(LocalDateTime.now());
+            instance.markRejected();
             instanceRepository.save(instance);
             notifyApplicant(instance, INSTANCE_REJECTED, approverId, comment);
             return;
         }
 
         if (!isStepApproved(stepTasks)) {
-            instance.setStatus(INSTANCE_PENDING);
+            instance.markPending(stepOrder);
             instanceRepository.save(instance);
             return;
         }
 
         ApprovalStep nextStep = findNextStep(instance.getProcess(), stepOrder);
         if (nextStep != null) {
-            instance.setStatus(INSTANCE_PENDING);
-            instance.setCurrentStep(nextStep.getStepOrder());
+            instance.markPending(nextStep.getStepOrder());
             instanceRepository.save(instance);
             activateStep(instance, nextStep.getStepOrder());
         } else {
-            instance.setStatus(INSTANCE_APPROVED);
-            instance.setCompletedTime(LocalDateTime.now());
+            instance.markApproved();
             instance.setCurrentStep(stepOrder);
             instanceRepository.save(instance);
             notifyApplicant(instance, INSTANCE_APPROVED, approverId, comment);
@@ -227,21 +260,21 @@ public class ApprovalServiceImpl implements ApprovalService {
 
     private boolean isStepApproved(List<ApprovalTask> stepTasks) {
         ApprovalStep step = stepTasks.get(0).getStep();
-        if ("MULTIPLE".equals(step.getApprovalType()) && Boolean.TRUE.equals(step.getMustPass())) {
-            return stepTasks.stream().allMatch(t -> TASK_APPROVED.equals(t.getStatus()));
+        if (step.isMultipleApproval() && step.requiresAllPass()) {
+            return stepTasks.stream().allMatch(ApprovalTask::isApproved);
         }
-        return stepTasks.stream().anyMatch(t -> TASK_APPROVED.equals(t.getStatus()));
+        return stepTasks.stream().anyMatch(ApprovalTask::isApproved);
     }
 
     private boolean canContinueAfterReject(ApprovalStep step) {
-        return "MULTIPLE".equals(step.getApprovalType()) && Boolean.FALSE.equals(step.getMustPass());
+        return step.allowsRejectContinue();
     }
 
     private void activateStep(ApprovalInstance instance, Integer stepOrder) {
         taskRepository.findByInstanceAndStepStepOrderOrderByTaskOrderAsc(instance, stepOrder)
                 .forEach(task -> {
-                    if (TASK_PENDING.equals(task.getStatus())) {
-                        task.setStatus(TASK_PROCESSING);
+                    if (task.isPending()) {
+                        task.markProcessing();
                         taskRepository.save(task);
                         notifyApprover(task, instance);
                     }
@@ -255,36 +288,59 @@ public class ApprovalServiceImpl implements ApprovalService {
                 .orElse(null);
     }
 
-    private void updateBusinessStatus(ApprovalInstance instance) {
-        String status     = instance.getStatus();
-        Long   businessId = instance.getBusinessId();
-        Long   approverId = getCurrentApproverId(instance);
+    private void updateBusinessStatus(ApprovalInstance instance, Long fallbackApproverId, String approvalComment) {
+        String status = instance.getStatus();
+        Long businessId = instance.getBusinessId();
+        Long approverId = resolveApproverId(instance, fallbackApproverId);
         try {
-            if ("LEAVE".equals(instance.getBusinessType())) {
-                leaveApplicationRepository.findById(businessId).ifPresent(app -> {
-                    app.setApprovalStatus(status);
-                    app.setApproverId(approverId);
-                    if (INSTANCE_PENDING.equals(status)) { app.setApprovalComment(null); app.setApprovalTime(null); }
-                    else { app.setApprovalTime(LocalDateTime.now()); }
-                    leaveApplicationRepository.save(app);
+            if (BUSINESS_TYPE_LEAVE.equals(instance.getBusinessType())) {
+                leaveApplicationRepository.findById(businessId).ifPresent(application -> {
+                    applyApprovalFields(application, status, approverId, approvalComment);
+                    leaveApplicationRepository.save(application);
                 });
-            } else if ("AWARD".equals(instance.getBusinessType())) {
-                awardApplicationRepository.findById(businessId).ifPresent(app -> {
-                    app.setApprovalStatus(status);
-                    app.setApproverId(approverId);
-                    if (INSTANCE_PENDING.equals(status)) { app.setApprovalComment(null); app.setApprovalTime(null); }
-                    else { app.setApprovalTime(LocalDateTime.now()); }
-                    awardApplicationRepository.save(app);
+            } else if (BUSINESS_TYPE_AWARD.equals(instance.getBusinessType())) {
+                awardApplicationRepository.findById(businessId).ifPresent(application -> {
+                    applyApprovalFields(application, status, approverId, approvalComment);
+                    awardApplicationRepository.save(application);
                 });
             }
-        } catch (Exception e) {
-            log.error("更新业务状态失败", e);
+        } catch (Exception exception) {
+            log.error("更新业务状态失败，businessType: {}, businessId: {}", instance.getBusinessType(), businessId, exception);
         }
+    }
+
+    private void applyApprovalFields(LeaveApplication application, String status, Long approverId, String approvalComment) {
+        application.setApprovalStatus(status);
+        application.setApproverId(approverId);
+        if (INSTANCE_PENDING.equals(status)) {
+            application.setApprovalComment(null);
+            application.setApprovalTime(null);
+            return;
+        }
+        application.setApprovalComment(approvalComment);
+        application.setApprovalTime(LocalDateTime.now());
+    }
+
+    private void applyApprovalFields(AwardApplication application, String status, Long approverId, String approvalComment) {
+        application.setApprovalStatus(status);
+        application.setApproverId(approverId);
+        if (INSTANCE_PENDING.equals(status)) {
+            application.setApprovalComment(null);
+            application.setApprovalTime(null);
+            return;
+        }
+        application.setApprovalComment(approvalComment);
+        application.setApprovalTime(LocalDateTime.now());
+    }
+
+    private Long resolveApproverId(ApprovalInstance instance, Long fallbackApproverId) {
+        Long currentApproverId = getCurrentApproverId(instance);
+        return currentApproverId != null ? currentApproverId : fallbackApproverId;
     }
 
     private Long getCurrentApproverId(ApprovalInstance instance) {
         return getCurrentTasks(instance).stream()
-                .filter(t -> TASK_PROCESSING.equals(t.getStatus()))
+                .filter(ApprovalTask::isProcessing)
                 .map(ApprovalTask::getApproverId)
                 .findFirst().orElse(null);
     }
@@ -309,12 +365,11 @@ public class ApprovalServiceImpl implements ApprovalService {
                     instance.getBusinessType(),
                     "您有新的" + businessName + "待审批",
                     String.format("您有一条新的%s（编号 #%d）需要您进行【%s】审批，请及时处理。",
-                            businessName, instance.getBusinessId(), stepName),
-                    Arrays.asList("SITE", "EMAIL")
+                            businessName, instance.getBusinessId(), stepName)
             );
             notificationService.sendAwardApprovalNotification(msg);
-        } catch (Exception e) {
-            log.error("发送审批者通知失败，approverId: {}", task.getApproverId(), e);
+        } catch (Exception exception) {
+            log.error("发送审批者通知失败，approverId: {}", task.getApproverId(), exception);
         }
     }
 
@@ -334,39 +389,39 @@ public class ApprovalServiceImpl implements ApprovalService {
             }
             User approver = approverId != null ? userRepository.findById(approverId).orElse(null) : null;
             String businessName = resolveBusinessName(instance.getBusinessType());
-            String statusText = INSTANCE_APPROVED.equals(finalStatus) ? "已通过" : "未通过";
+            String statusText = resolveApplicantStatusText(finalStatus);
             NotificationMessage msg = buildNotificationMessage(
                     applicant,
                     instance,
-                    "APPROVAL_RESULT",
+                    NotificationTypeEnum.APPROVAL_RESULT.getCode(),
                     businessName + "审批结果通知",
                     String.format("您的%s（编号 #%d）审批%s。审批意见：%s",
                             businessName, instance.getBusinessId(), statusText,
-                            comment != null ? comment : "无"),
-                    Arrays.asList("SITE", "EMAIL")
+                            comment != null ? comment : "无")
             );
             msg.setApprovalStatus(finalStatus);
             msg.setApprovalComment(comment);
             msg.setApproverName(approver != null ? approver.getRealName() : "系统");
             notificationService.sendAwardApprovalNotification(msg);
-        } catch (Exception e) {
-            log.error("发送申请者通知失败，instanceId: {}", instance.getId(), e);
+        } catch (Exception exception) {
+            log.error("发送申请者通知失败，instanceId: {}", instance.getId(), exception);
         }
     }
 
     private NotificationMessage buildNotificationMessage(User receiver, ApprovalInstance instance,
-                                                         String type, String title, String content,
-                                                         List<String> channels) {
+                                                         String type, String title, String content) {
         NotificationMessage message = NotificationMessage.builder()
                 .userId(receiver.getId())
                 .phone(receiver.getPhone())
                 .email(receiver.getEmail())
+                .wechatOpenId(receiver.getWechatOpenId())
+                .weworkUserId(receiver.getWeworkUserId())
                 .type(type)
                 .title(title)
                 .content(content)
                 .businessId(instance.getBusinessId())
                 .businessType(instance.getBusinessType())
-                .channels(channels)
+                .channels(ApprovalServiceImpl.DEFAULT_NOTIFICATION_CHANNELS)
                 .receiverName(receiver.getRealName())
                 .build();
         fillNotificationBusinessInfo(message, instance, receiver);
@@ -376,7 +431,7 @@ public class ApprovalServiceImpl implements ApprovalService {
     private void fillNotificationBusinessInfo(NotificationMessage message, ApprovalInstance instance, User receiver) {
         message.setApplicantName(receiver.getRealName());
 
-        if ("AWARD".equals(instance.getBusinessType())) {
+        if (BUSINESS_TYPE_AWARD.equals(instance.getBusinessType())) {
             AwardApplication application = awardApplicationRepository.findById(instance.getBusinessId()).orElse(null);
             if (application != null) {
                 message.setApplicantName(application.getStudentName() != null ? application.getStudentName() : receiver.getRealName());
@@ -387,12 +442,12 @@ public class ApprovalServiceImpl implements ApprovalService {
             return;
         }
 
-        if ("LEAVE".equals(instance.getBusinessType())) {
+        if (BUSINESS_TYPE_LEAVE.equals(instance.getBusinessType())) {
             LeaveApplication application = leaveApplicationRepository.findById(instance.getBusinessId()).orElse(null);
             if (application != null) {
                 message.setApplicantName(application.getStudentName() != null ? application.getStudentName() : receiver.getRealName());
-                message.setApplicationType("LEAVE");
-                message.setAwardName(resolveLeaveTypeName(application.getLeaveType()));
+                message.setApplicationType(BUSINESS_TYPE_LEAVE);
+                message.setAwardName(LeaveTypeEnum.getDescriptionByCode(application.getLeaveType()));
                 message.setLeaveStartDate(application.getStartDate());
                 message.setLeaveEndDate(application.getEndDate());
                 message.setLeaveDays(application.getDays());
@@ -401,19 +456,11 @@ public class ApprovalServiceImpl implements ApprovalService {
         }
     }
 
-    private String resolveLeaveTypeName(String leaveType) {
-        if (leaveType == null) {
-            return null;
-        }
-        return switch (leaveType) {
-            case "SICK" -> "病假";
-            case "PERSONAL" -> "事假";
-            case "OFFICIAL" -> "公假";
-            default -> leaveType;
-        };
+    private String resolveBusinessName(String businessType) {
+        return BUSINESS_TYPE_LEAVE.equals(businessType) ? "请假申请" : "奖助申请";
     }
 
-    private String resolveBusinessName(String businessType) {
-        return "LEAVE".equals(businessType) ? "请假申请" : "奖助申请";
+    private String resolveApplicantStatusText(String finalStatus) {
+        return INSTANCE_APPROVED.equals(finalStatus) ? STATUS_TEXT_APPROVED : STATUS_TEXT_REJECTED;
     }
 }

@@ -18,8 +18,4 @@ public interface ApprovalStepRepository extends JpaRepository<ApprovalStep, Long
      */
     List<ApprovalStep> findByProcessOrderByStepOrderAsc(ApprovalProcess process);
 
-    /**
-     * 根据流程ID和步骤顺序查询步骤
-     */
-    ApprovalStep findByProcessAndStepOrder(ApprovalProcess process, Integer stepOrder);
 }

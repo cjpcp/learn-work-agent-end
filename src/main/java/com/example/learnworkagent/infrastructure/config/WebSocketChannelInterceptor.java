@@ -42,18 +42,13 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
     }
 
     /**
-     * 简单的Principal实现
-     */
-    private static class StompPrincipal implements Principal {
-        private final String name;
-
-        public StompPrincipal(String name) {
-            this.name = name;
-        }
+         * 简单的Principal实现
+         */
+        private record StompPrincipal(String name) implements Principal {
 
         @Override
-        public String getName() {
-            return name;
+            public String getName() {
+                return name;
+            }
         }
-    }
 }

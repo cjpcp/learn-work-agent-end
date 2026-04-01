@@ -2,9 +2,9 @@ package com.example.learnworkagent.domain.approval.entity;
 
 import com.example.learnworkagent.common.BaseEntity;
 import jakarta.persistence.*;
-import org.hibernate.annotations.Comment;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.hibernate.annotations.Comment;
 
 /**
  * 审批流程定义
@@ -15,6 +15,8 @@ import lombok.EqualsAndHashCode;
 @Comment("审批流程表")
 @Table(name = "approval_process")
 public class ApprovalProcess extends BaseEntity {
+
+    private static final int INITIAL_VERSION = 1;
 
     /**
      * 流程名称
@@ -63,5 +65,18 @@ public class ApprovalProcess extends BaseEntity {
      */
     @Comment("版本号")
     @Column(name = "version", nullable = false)
-    private Integer version = 1;
+    private Integer version = INITIAL_VERSION;
+
+    public void syncCompatibleFields() {
+        this.name = this.processName;
+        this.type = this.processType;
+    }
+
+    public void enable() {
+        this.enabled = Boolean.TRUE;
+    }
+
+    public void disable() {
+        this.enabled = Boolean.FALSE;
+    }
 }

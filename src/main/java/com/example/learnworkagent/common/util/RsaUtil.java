@@ -56,7 +56,7 @@ public class RsaUtil {
     public void init() {
         try {
             Security.addProvider(new BouncyCastleProvider());
-            privateKey = loadPrivateKey(PRIVATE_KEY);
+            privateKey = loadPrivateKey();
             log.info("RSA私钥加载成功");
         } catch (Exception e) {
             log.error("RSA私钥加载失败", e);
@@ -66,8 +66,8 @@ public class RsaUtil {
     /**
      * 加载私钥
      */
-    private PrivateKey loadPrivateKey(String privateKeyStr) throws Exception {
-        String privateKeyPEM = privateKeyStr
+    private PrivateKey loadPrivateKey() throws Exception {
+        String privateKeyPEM = RsaUtil.PRIVATE_KEY
                 .replace("-----BEGIN PRIVATE KEY-----", "")
                 .replace("-----END PRIVATE KEY-----", "")
                 .replaceAll("\\s", "");
@@ -102,14 +102,4 @@ public class RsaUtil {
         }
     }
 
-    /**
-     * 判断是否为加密数据（简单的启发式判断）
-     */
-    public boolean isEncrypted(String data) {
-        if (data == null || data.isEmpty()) {
-            return false;
-        }
-        // 加密数据通常是Base64格式，长度较长且包含特定字符
-        return data.length() > 50 && data.matches("^[A-Za-z0-9+/=]+$");
-    }
 }

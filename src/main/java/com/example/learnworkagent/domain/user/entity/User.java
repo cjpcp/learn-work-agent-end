@@ -28,7 +28,7 @@ public class User extends BaseEntity {
      * 密码（加密后）
      */
     @Comment("密码（加密后）")
-    @Column(name = "password", nullable = false, length = 255)
+    @Column(name = "password", nullable = false)
     private String password;
 
     /**
@@ -58,6 +58,20 @@ public class User extends BaseEntity {
     @Comment("邮箱")
     @Column(name = "email", length = 100)
     private String email;
+
+    /**
+     * 微信 OpenID
+     */
+    @Comment("微信 OpenID")
+    @Column(name = "wechat_open_id", length = 100)
+    private String wechatOpenId;
+
+    /**
+     * 企业微信 UserId
+     */
+    @Comment("企业微信 UserId")
+    @Column(name = "wework_user_id", length = 100)
+    private String weworkUserId;
 
     /**
      * 角色

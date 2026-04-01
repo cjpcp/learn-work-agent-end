@@ -5,13 +5,14 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 /**
- * 通知消息 - 用于RabbitMQ传输
+ * 通知消息实体，用于 RabbitMQ 传输。
  */
 @Data
 @Builder
@@ -19,129 +20,75 @@ import java.util.List;
 @AllArgsConstructor
 public class NotificationMessage implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 接收用户ID
-     */
+    /** 接收用户ID。 */
     private Long userId;
 
-    /**
-     * 用户手机号
-     */
+    /** 用户手机号。 */
     private String phone;
 
-    /**
-     * 用户邮箱
-     */
+    /** 用户邮箱。 */
     private String email;
 
-    /**
-     * 通知类型
-     */
+    /** 通知类型。 */
     private String type;
 
-    /**
-     * 通知标题
-     */
+    /** 通知标题。 */
     private String title;
 
-    /**
-     * 通知内容
-     */
+    /** 通知内容。 */
     private String content;
 
-    /**
-     * 关联业务ID
-     */
+    /** 关联业务ID。 */
     private Long businessId;
 
-    /**
-     * 关联业务类型
-     */
+    /** 关联业务类型。 */
     private String businessType;
 
-    /**
-     * 推送渠道列表
-     */
+    /** 推送渠道列表。 */
     private List<String> channels;
 
-    // ==================== 奖助申请相关字段 ====================
-
-    /**
-     * 接收人姓名
-     */
+    /** 接收人姓名。 */
     private String receiverName;
 
-    /**
-     * 申请人姓名
-     */
+    /** 申请人姓名。 */
     private String applicantName;
 
-    /**
-     * 申请类型
-     */
+    /** 申请类型。 */
     private String applicationType;
 
-    /**
-     * 奖项名称
-     */
+    /** 奖项名称或请假类型名称。 */
     private String awardName;
 
-    /**
-     * 申请金额
-     */
+    /** 申请金额。 */
     private BigDecimal amount;
 
-    /**
-     * 审批状态
-     */
+    /** 审批状态。 */
     private String approvalStatus;
 
-    /**
-     * 审批意见
-     */
+    /** 审批意见。 */
     private String approvalComment;
 
-    /**
-     * 审批人姓名
-     */
+    /** 审批人姓名。 */
     private String approverName;
 
-    // ==================== 请假申请相关字段 ====================
-
-    /**
-     * 请假开始日期
-     */
+    /** 请假开始日期。 */
     private LocalDate leaveStartDate;
 
-    /**
-     * 请假结束日期
-     */
+    /** 请假结束日期。 */
     private LocalDate leaveEndDate;
 
-    /**
-     * 请假天数
-     */
+    /** 请假天数。 */
     private Integer leaveDays;
 
-    /**
-     * 请假原因
-     */
+    /** 请假原因。 */
     private String leaveReason;
 
-    // ==================== 微信相关字段 ====================
-
-    /**
-     * 用户微信 OpenID（公众号推送使用）
-     */
+    /** 用户微信 OpenID。 */
     private String wechatOpenId;
 
-    // ==================== 企业微信相关字段 ====================
-
-    /**
-     * 用户企业微信账号 UserId（应用消息推送使用）
-     * 对应企业微信管理后台中的成员账号
-     */
+    /** 用户企业微信账号 UserId。 */
     private String weworkUserId;
 }

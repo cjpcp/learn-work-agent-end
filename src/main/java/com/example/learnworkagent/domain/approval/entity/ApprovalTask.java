@@ -1,10 +1,11 @@
 package com.example.learnworkagent.domain.approval.entity;
 
 import com.example.learnworkagent.common.BaseEntity;
+import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
 import jakarta.persistence.*;
-import org.hibernate.annotations.Comment;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.hibernate.annotations.Comment;
 
 import java.time.LocalDateTime;
 
@@ -46,7 +47,7 @@ public class ApprovalTask extends BaseEntity {
      */
     @Comment("审批状态")
     @Column(name = "status", nullable = false, length = 20)
-    private String status = "PENDING";
+    private String status = ApprovalStatusEnum.PENDING.getCode();
 
     /**
      * 审批意见
@@ -68,4 +69,44 @@ public class ApprovalTask extends BaseEntity {
     @Comment("任务顺序")
     @Column(name = "task_order")
     private Integer taskOrder;
+
+    public boolean isPending() {
+        return ApprovalStatusEnum.PENDING.getCode().equals(status);
+    }
+
+    public boolean isProcessing() {
+        return ApprovalStatusEnum.PROCESSING.getCode().equals(status);
+    }
+
+    public boolean isApproved() {
+        return ApprovalStatusEnum.APPROVED.getCode().equals(status);
+    }
+
+    public boolean isRejected() {
+        return ApprovalStatusEnum.REJECTED.getCode().equals(status);
+    }
+
+    public void markPending() {
+        this.status = ApprovalStatusEnum.PENDING.getCode();
+        this.comment = null;
+        this.approvalTime = null;
+    }
+
+    public void markProcessing() {
+        this.status = ApprovalStatusEnum.PROCESSING.getCode();
+        this.comment = null;
+        this.approvalTime = null;
+    }
+
+    public void markApproved(String comment) {
+        this.status = ApprovalStatusEnum.APPROVED.getCode();
+        this.comment = comment;
+        this.approvalTime = LocalDateTime.now();
+    }
+
+    public void markRejected(String comment) {
+        this.status = ApprovalStatusEnum.REJECTED.getCode();
+        this.comment = comment;
+        this.approvalTime = LocalDateTime.now();
+    }
 }

@@ -1,6 +1,5 @@
 package com.example.learnworkagent.domain.user.service.impl;
 
-import com.example.learnworkagent.common.enums.RoleEnum;
 import com.example.learnworkagent.domain.user.entity.User;
 import com.example.learnworkagent.domain.user.repository.UserRepository;
 import com.example.learnworkagent.domain.user.service.UserService;

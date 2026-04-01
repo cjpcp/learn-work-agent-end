@@ -1,5 +1,8 @@
 package com.example.learnworkagent.infrastructure.external.notification;
 
+import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
+import com.example.learnworkagent.common.enums.NotificationChannelEnum;
+import com.example.learnworkagent.common.enums.NotificationTypeEnum;
 import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
 import com.example.learnworkagent.domain.notification.service.NotificationSender;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -16,31 +19,36 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 企业微信应用消息通知发送器
- * 通过企业微信「应用消息」接口向指定成员推送消息
- * 文档：https://developer.work.weixin.qq.com/document/path/90236
+ * 企业微信应用消息通知发送器。
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class WeworkNotificationSender implements NotificationSender {
 
+    private static final String WEWORK_API_BASE = "https://qyapi.weixin.qq.com";
+    private static final String CHANNEL_WEWORK = NotificationChannelEnum.WEWORK.getCode();
+    private static final String NOTIFICATION_TYPE_APPROVAL_RESULT = NotificationTypeEnum.APPROVAL_RESULT.getCode();
+    private static final String ACCESS_TOKEN_CACHE_KEY = "wework:app:access_token";
+    private static final String DEFAULT_TITLE = "审批结果通知";
+    private static final String DEFAULT_APPROVAL_COMMENT = "无";
+    private static final String DEFAULT_APPROVER_NAME = "系统";
+    private static final String DETAIL_BUTTON_TEXT = "查看详情";
+    private static final String DETAIL_URL = "https://work.weixin.qq.com";
+    private static final long ACCESS_TOKEN_EXPIRE_SECONDS = 6900L;
+    private static final String DEFAULT_APPLICANT_NAME = "";
+    private static final String SUCCESS_RESPONSE_TEXT = "\"errcode\":0";
+
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
 
-    private static final String WEWORK_API_BASE = "https://qyapi.weixin.qq.com";
-    private static final String ACCESS_TOKEN_CACHE_KEY = "wework:app:access_token";
-
-    /** 企业ID，企业微信管理后台 -> 我的企业 -> 企业信息 */
     @Value("${wework.app.corp-id:}")
     private String corpId;
 
-    /** 应用 Secret，企业微信管理后台 -> 应用管理 -> 对应应用 -> Secret */
     @Value("${wework.app.corp-secret:}")
     private String corpSecret;
 
-    /** 应用 AgentID，企业微信管理后台 -> 应用管理 -> 对应应用 -> AgentId */
     @Value("${wework.app.agent-id:}")
     private String agentId;
 
@@ -49,30 +57,26 @@ public class WeworkNotificationSender implements NotificationSender {
 
     @Override
     public String getChannel() {
-        return "WEWORK";
+        return CHANNEL_WEWORK;
     }
 
     @Override
     public boolean send(NotificationMessage message) {
-        if (corpId == null || corpId.isBlank()
-                || corpSecret == null || corpSecret.isBlank()
-                || agentId == null || agentId.isBlank()) {
+        if (hasBlank(corpId) || hasBlank(corpSecret) || hasBlank(agentId)) {
             log.warn("企业微信应用配置不完整（corpId/corpSecret/agentId），跳过推送，用户ID: {}", message.getUserId());
             return false;
         }
 
         String weworkUserId = message.getWeworkUserId();
-        if (weworkUserId == null || weworkUserId.isBlank()) {
+        if (hasBlank(weworkUserId)) {
             log.warn("用户未绑定企业微信 UserId，跳过应用消息推送，用户ID: {}", message.getUserId());
             return false;
         }
 
         try {
             String content = buildTextCardContent(message);
-
             if (mockEnabled) {
-                log.info("【企业微信应用消息模拟推送】用户ID: {}, 企微UserId: {}\n内容: {}",
-                        message.getUserId(), weworkUserId, content);
+                logMockMessage(message, weworkUserId, content);
                 return true;
             }
 
@@ -82,100 +86,135 @@ public class WeworkNotificationSender implements NotificationSender {
                 return false;
             }
 
-            // 构造文本卡片消息体
-            Map<String, Object> textCard = new HashMap<>();
-            textCard.put("title", message.getTitle() != null ? message.getTitle() : "审批结果通知");
-            textCard.put("description", content);
-            textCard.put("url", "https://work.weixin.qq.com"); // 可替换为系统实际跳转URL
-            textCard.put("btntxt", "查看详情");
-
-            Map<String, Object> body = new HashMap<>();
-            body.put("touser", weworkUserId);   // 收件人企业微信账号，多人用 | 分隔
-            body.put("msgtype", "textcard");
-            body.put("agentid", Integer.parseInt(agentId));
-            body.put("textcard", textCard);
-
-            String url = WEWORK_API_BASE + "/cgi-bin/message/send?access_token=" + accessToken;
             String response = webClientBuilder.build()
                     .post()
-                    .uri(url)
+                    .uri(WEWORK_API_BASE + "/cgi-bin/message/send?access_token=" + accessToken)
                     .header("Content-Type", "application/json")
-                    .bodyValue(objectMapper.writeValueAsString(body))
+                    .bodyValue(objectMapper.writeValueAsString(buildMessageBody(weworkUserId, content, resolveTitle(message))))
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
 
             log.info("企业微信应用消息推送响应: {}", response);
-
-            // 成功响应: {"errcode":0,"errmsg":"ok",...}
-            boolean success = response != null && response.contains("\"errcode\":0");
+            boolean success = isSuccessResponse(response);
             log.info("企业微信应用消息推送{}，用户ID: {}", success ? "成功" : "失败", message.getUserId());
             return success;
-
-        } catch (Exception e) {
-            log.error("企业微信应用消息推送异常，用户ID: {}", message.getUserId(), e);
+        } catch (Exception exception) {
+            log.error("企业微信应用消息推送异常，用户ID: {}", message.getUserId(), exception);
             return false;
         }
     }
 
-    /**
-     * 构建文本卡片 description 内容（支持简单 HTML）
-     */
-    private String buildTextCardContent(NotificationMessage message) {
-        String statusText = "APPROVED".equals(message.getApprovalStatus()) ? "已通过" : "未通过";
-        String statusColor = "APPROVED".equals(message.getApprovalStatus())
-                ? "<font color=\"info\">" : "<font color=\"warning\">";
+    private Map<String, Object> buildMessageBody(String weworkUserId, String content, String title) {
+        Map<String, Object> textCard = new HashMap<>(4);
+        textCard.put("title", title);
+        textCard.put("description", content);
+        textCard.put("url", DETAIL_URL);
+        textCard.put("btntxt", DETAIL_BUTTON_TEXT);
 
-        String applicantName = message.getApplicantName() != null ? message.getApplicantName() : "";
-        String approvalComment = message.getApprovalComment() != null ? message.getApprovalComment() : "无";
-        String approverName = message.getApproverName() != null ? message.getApproverName() : "系统";
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("申请人：").append(applicantName).append("<br/>");
-        sb.append("审批状态：").append(statusColor).append(statusText).append("</font><br/>");
-        if (message.getAwardName() != null) {
-            sb.append("奖项名称：").append(message.getAwardName()).append("<br/>");
-        }
-        if (message.getAmount() != null) {
-            sb.append("申请金额：¥").append(message.getAmount()).append("<br/>");
-        }
-        sb.append("审批意见：").append(approvalComment).append("<br/>");
-        sb.append("审批人：").append(approverName);
-        return sb.toString();
+        Map<String, Object> body = new HashMap<>(4);
+        body.put("touser", weworkUserId);
+        body.put("msgtype", "textcard");
+        body.put("agentid", Integer.parseInt(agentId));
+        body.put("textcard", textCard);
+        return body;
     }
 
-    /**
-     * 获取企业微信应用 AccessToken（带 Redis 缓存，有效期 7200s，缓存 6900s）
-     */
-    private String getAccessToken() {
-        String cached = redisTemplate.opsForValue().get(ACCESS_TOKEN_CACHE_KEY);
-        if (cached != null && !cached.isBlank()) {
-            return cached;
+    private String buildTextCardContent(NotificationMessage message) {
+        StringBuilder contentBuilder = new StringBuilder();
+        contentBuilder.append("申请人：").append(defaultText(message.getApplicantName(), DEFAULT_APPLICANT_NAME)).append("<br/>");
+        contentBuilder.append("审批状态：")
+                .append(resolveStatusColor(message))
+                .append(resolveStatusText(message))
+                .append("</font><br/>");
+        appendIfPresent(contentBuilder, message.getAwardName());
+        if (message.getAmount() != null) {
+            contentBuilder.append("申请金额：¥").append(message.getAmount()).append("<br/>");
         }
+        contentBuilder.append("审批意见：")
+                .append(defaultText(message.getApprovalComment(), DEFAULT_APPROVAL_COMMENT))
+                .append("<br/>");
+        contentBuilder.append("审批人：")
+                .append(defaultText(message.getApproverName(), DEFAULT_APPROVER_NAME));
+        return contentBuilder.toString();
+    }
+
+    private void appendIfPresent(StringBuilder contentBuilder, String value) {
+        if (!hasBlank(value)) {
+            contentBuilder.append("奖项名称：").append(value).append("<br/>");
+        }
+    }
+
+    private String getAccessToken() {
+        String cachedToken = redisTemplate.opsForValue().get(ACCESS_TOKEN_CACHE_KEY);
+        if (!hasBlank(cachedToken)) {
+            return cachedToken;
+        }
+
         try {
-            String url = WEWORK_API_BASE + "/cgi-bin/gettoken?corpid=" + corpId + "&corpsecret=" + corpSecret;
             String response = webClientBuilder.build()
                     .get()
-                    .uri(url)
+                    .uri(WEWORK_API_BASE + "/cgi-bin/gettoken?corpid=" + corpId + "&corpsecret=" + corpSecret)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
 
-            if (response == null) return null;
+            if (response == null) {
+                return null;
+            }
 
             JsonNode node = objectMapper.readTree(response);
-            if (node.has("access_token")) {
-                String token = node.get("access_token").asText();
-                redisTemplate.opsForValue().set(ACCESS_TOKEN_CACHE_KEY, token, 6900, TimeUnit.SECONDS);
-                log.info("企业微信应用 AccessToken 刷新成功");
-                return token;
-            } else {
+            if (!node.has("access_token")) {
                 log.error("获取企业微信 AccessToken 失败，响应: {}", response);
                 return null;
             }
-        } catch (Exception e) {
-            log.error("请求企业微信 AccessToken 异常", e);
+
+            String token = node.get("access_token").asText();
+            redisTemplate.opsForValue().set(ACCESS_TOKEN_CACHE_KEY, token, ACCESS_TOKEN_EXPIRE_SECONDS, TimeUnit.SECONDS);
+            log.info("企业微信应用 AccessToken 刷新成功");
+            return token;
+        } catch (Exception exception) {
+            log.error("请求企业微信 AccessToken 异常", exception);
             return null;
         }
+    }
+
+    private String resolveTitle(NotificationMessage message) {
+        return defaultText(message.getTitle(), DEFAULT_TITLE);
+    }
+
+    private String resolveStatusText(NotificationMessage message) {
+        return isApprovalResultNotification(message) && isApproved(message) ? "已通过" : "未通过";
+    }
+
+    private String resolveStatusColor(NotificationMessage message) {
+        return isApprovalResultNotification(message) && isApproved(message)
+                ? "<font color=\"info\">"
+                : "<font color=\"warning\">";
+    }
+
+    private boolean isApprovalResultNotification(NotificationMessage message) {
+        return NOTIFICATION_TYPE_APPROVAL_RESULT.equals(message.getType());
+    }
+
+    private boolean isApproved(NotificationMessage message) {
+        return ApprovalStatusEnum.APPROVED.getCode().equals(message.getApprovalStatus());
+    }
+
+    private boolean isSuccessResponse(String response) {
+        return response != null && response.contains(SUCCESS_RESPONSE_TEXT);
+    }
+
+    private void logMockMessage(NotificationMessage message, String weworkUserId, String content) {
+        log.info("【企业微信应用消息模拟推送】用户ID: {}, 企微UserId: {}\n标题: {}\n内容: {}",
+                message.getUserId(), weworkUserId, resolveTitle(message), content);
+    }
+
+    private String defaultText(String value, String defaultValue) {
+        return hasBlank(value) ? defaultValue : value;
+    }
+
+    private boolean hasBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

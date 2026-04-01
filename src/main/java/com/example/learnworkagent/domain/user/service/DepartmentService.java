@@ -1,7 +1,6 @@
 package com.example.learnworkagent.domain.user.service;
 
 import com.example.learnworkagent.common.enums.DepartmentTypeEnum;
-import com.example.learnworkagent.common.enums.UserStatusEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.domain.user.entity.Department;
@@ -24,13 +23,6 @@ public class DepartmentService {
     private final DepartmentRepository departmentRepository;
 
     /**
-     * 获取所有启用的部门列表
-     */
-    public List<Department> getEnabledDepartments() {
-        return departmentRepository.findByEnabledAndDeletedFalseOrderBySortOrderAsc(true);
-    }
-
-    /**
      * 获取所有启用的学院列表
      */
     public List<Department> getEnabledColleges() {
@@ -45,33 +37,10 @@ public class DepartmentService {
     }
 
     /**
-     * 获取所有部门列表
-     */
-    public List<Department> getAllDepartments() {
-        return departmentRepository.findAll();
-    }
-
-    /**
      * 根据ID获取部门
      */
     public Department getDepartmentById(Long id) {
         return departmentRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(ResultCode.FAIL, "部门不存在"));
-    }
-
-    /**
-     * 根据代码获取部门
-     */
-    public Department getDepartmentByCode(String code) {
-        return departmentRepository.findByCodeAndDeletedFalse(code)
-                .orElseThrow(() -> new BusinessException(ResultCode.FAIL, "部门不存在"));
-    }
-
-    /**
-     * 根据名称获取部门
-     */
-    public Department getDepartmentByName(String name) {
-        return departmentRepository.findByNameAndDeletedFalse(name)
                 .orElseThrow(() -> new BusinessException(ResultCode.FAIL, "部门不存在"));
     }
 

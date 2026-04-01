@@ -67,20 +67,6 @@ public class Result<T> implements Serializable {
     }
 
     /**
-     * 失败响应
-     */
-    public static <T> Result<T> fail() {
-        return new Result<>(ResultCode.FAIL.getCode(), ResultCode.FAIL.getMessage(), null);
-    }
-
-    /**
-     * 失败响应（自定义消息）
-     */
-    public static <T> Result<T> fail(String message) {
-        return new Result<>(ResultCode.FAIL.getCode(), message, null);
-    }
-
-    /**
      * 失败响应（自定义错误码和消息）
      */
     public static <T> Result<T> fail(Integer code, String message) {
