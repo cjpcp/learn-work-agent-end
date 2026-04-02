@@ -22,8 +22,12 @@ import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.repository.LeaveApplicationRepository;
 import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
 import com.example.learnworkagent.domain.notification.service.NotificationService;
-import com.example.learnworkagent.domain.user.entity.User;
-import com.example.learnworkagent.domain.user.repository.UserRepository;
+import com.example.learnworkagent.domain.user.entity.Admin;
+import com.example.learnworkagent.domain.user.entity.Role;
+import com.example.learnworkagent.domain.user.entity.Teacher;
+import com.example.learnworkagent.domain.user.repository.AdminRepository;
+import com.example.learnworkagent.domain.user.repository.RoleRepository;
+import com.example.learnworkagent.domain.user.repository.TeacherRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,11 +38,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
-import static com.example.learnworkagent.common.enums.RoleEnum.COLLEGE_LEADER;
-import static com.example.learnworkagent.common.enums.RoleEnum.COUNSELOR;
-import static com.example.learnworkagent.common.enums.RoleEnum.DEPARTMENT_LEADER;
 
 /**
  * 审批服务实现
@@ -74,7 +74,9 @@ public class ApprovalServiceImpl implements ApprovalService {
     private final ApprovalStepRepository     stepRepository;
     private final AwardApplicationRepository awardApplicationRepository;
     private final LeaveApplicationRepository leaveApplicationRepository;
-    private final UserRepository             userRepository;
+    private final AdminRepository            adminRepository;
+    private final TeacherRepository          teacherRepository;
+    private final RoleRepository             roleRepository;
     private final NotificationService        notificationService;
     private final ObjectMapper               objectMapper;
 
@@ -155,10 +157,13 @@ public class ApprovalServiceImpl implements ApprovalService {
 
     private void createApprovalTasks(ApprovalInstance instance, ApprovalStep step, String applicantInfo) {
         try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> data = objectMapper.readValue(applicantInfo, Map.class);
-            List<Long> approvers = findApprovers(step, data).stream().distinct().toList();
-            if (approvers.isEmpty()) throw new BusinessException("审批步骤未找到审批人: " + step.getStepName());
+            if (applicantInfo != null && !applicantInfo.isBlank()) {
+                objectMapper.readTree(applicantInfo);
+            }
+            List<Long> approvers = findApprovers(step).stream().distinct().toList();
+            if (approvers.isEmpty()) {
+                throw new BusinessException(ResultCode.PARAM_ERROR, "审批步骤未找到审批人: " + step.getStepName());
+            }
             for (int i = 0; i < approvers.size(); i++) {
                 ApprovalTask task = new ApprovalTask();
                 task.setInstance(instance);
@@ -176,51 +181,20 @@ public class ApprovalServiceImpl implements ApprovalService {
         }
     }
 
-    private List<Long> findApprovers(ApprovalStep step, Map<String, Object> data) {
+    private List<Long> findApprovers(ApprovalStep step) {
         List<Long> approvers = new ArrayList<>();
-        Object deptIdObj = data.get("departmentId");
-        String grade = (String) data.get("grade");
-        Long departmentId;
-
-        if (step.isCounselorStep()) {
-            if (deptIdObj == null) {
-                throw new BusinessException("本次申请学院id为空！");
-            }
-            if (grade == null || grade.isEmpty()) {
-                throw new BusinessException("本次申请年级为空！");
-            }
-            departmentId = Long.valueOf(deptIdObj.toString());
-            userRepository.findByDepartmentIdAndGradeAndRole(departmentId, grade, COUNSELOR.getCode())
-                    .forEach(user -> approvers.add(user.getId()));
+        if (step.hasAssignedApprover()) {
+            approvers.add(step.getApproverUserId());
             return approvers;
         }
 
-        if (step.isCollegeLeaderStep()) {
-            if (deptIdObj == null) {
-                throw new BusinessException("本次申请学院id为空！");
-            }
-            departmentId = Long.valueOf(deptIdObj.toString());
-            userRepository.findByDepartmentIdAndRole(departmentId, COLLEGE_LEADER.getCode())
-                    .forEach(user -> approvers.add(user.getId()));
-            return approvers;
-        }
-
-        if (step.isDepartmentLeaderStep()) {
-            if (step.hasAssignedApprover()) {
-                approvers.add(step.getApproverUserId());
-                return approvers;
-            }
-
-            departmentId = step.getDepartmentId();
-            if (departmentId == null) {
-                throw new BusinessException("部门领导审批，但未设置领导的部门！");
-            }
-            userRepository.findByDepartmentIdAndRole(departmentId, DEPARTMENT_LEADER.getCode())
-                    .forEach(user -> approvers.add(user.getId()));
-            return approvers;
-        }
-
-        throw new BusinessException("未知的审批人角色: " + step.getApproverRole());
+        Role role = roleRepository.findByRoleName(step.getApproverRole())
+                .orElseThrow(() -> new BusinessException("审批角色不存在: " + step.getApproverRole()));
+        adminRepository.findByRoleId(role.getId())
+                .stream()
+                .filter(Admin::isEnabled)
+                .forEach(admin -> approvers.add(admin.getId()));
+        return approvers;
     }
 
     private void handleStepProgress(ApprovalInstance instance, Integer stepOrder,
@@ -352,7 +326,7 @@ public class ApprovalServiceImpl implements ApprovalService {
     /** 通知审批者：您有新的待审批任务 */
     private void notifyApprover(ApprovalTask task, ApprovalInstance instance) {
         try {
-            User approver = userRepository.findById(task.getApproverId()).orElse(null);
+            Admin approver = adminRepository.findById(task.getApproverId()).orElse(null);
             if (approver == null) {
                 log.warn("审批者不存在，跳过通知，approverId: {}", task.getApproverId());
                 return;
@@ -382,12 +356,12 @@ public class ApprovalServiceImpl implements ApprovalService {
                 log.warn("审批实例未记录申请人ID，跳过申请者通知，instanceId: {}", instance.getId());
                 return;
             }
-            User applicant = userRepository.findById(applicantId).orElse(null);
+            Admin applicant = adminRepository.findById(applicantId).orElse(null);
             if (applicant == null) {
                 log.warn("申请者不存在，跳过通知，applicantId: {}", applicantId);
                 return;
             }
-            User approver = approverId != null ? userRepository.findById(approverId).orElse(null) : null;
+            Admin approver = approverId != null ? adminRepository.findById(approverId).orElse(null) : null;
             String businessName = resolveBusinessName(instance.getBusinessType());
             String statusText = resolveApplicantStatusText(finalStatus);
             NotificationMessage msg = buildNotificationMessage(
@@ -401,40 +375,41 @@ public class ApprovalServiceImpl implements ApprovalService {
             );
             msg.setApprovalStatus(finalStatus);
             msg.setApprovalComment(comment);
-            msg.setApproverName(approver != null ? approver.getRealName() : "系统");
+            msg.setApproverName(resolveDisplayName(approver));
             notificationService.sendAwardApprovalNotification(msg);
         } catch (Exception exception) {
             log.error("发送申请者通知失败，instanceId: {}", instance.getId(), exception);
         }
     }
 
-    private NotificationMessage buildNotificationMessage(User receiver, ApprovalInstance instance,
+    private NotificationMessage buildNotificationMessage(Admin receiver, ApprovalInstance instance,
                                                          String type, String title, String content) {
+        Teacher teacher = teacherRepository.findById(receiver.getTeacherId()).orElse(null);
         NotificationMessage message = NotificationMessage.builder()
                 .userId(receiver.getId())
-                .phone(receiver.getPhone())
-                .email(receiver.getEmail())
-                .wechatOpenId(receiver.getWechatOpenId())
-                .weworkUserId(receiver.getWeworkUserId())
+                .phone(teacher != null ? teacher.getPhone() : null)
+                .email(null)
+                .wechatOpenId(null)
+                .weworkUserId(null)
                 .type(type)
                 .title(title)
                 .content(content)
                 .businessId(instance.getBusinessId())
                 .businessType(instance.getBusinessType())
                 .channels(ApprovalServiceImpl.DEFAULT_NOTIFICATION_CHANNELS)
-                .receiverName(receiver.getRealName())
+                .receiverName(resolveDisplayName(receiver))
                 .build();
         fillNotificationBusinessInfo(message, instance, receiver);
         return message;
     }
 
-    private void fillNotificationBusinessInfo(NotificationMessage message, ApprovalInstance instance, User receiver) {
-        message.setApplicantName(receiver.getRealName());
+    private void fillNotificationBusinessInfo(NotificationMessage message, ApprovalInstance instance, Admin receiver) {
+        message.setApplicantName(resolveDisplayName(receiver));
 
         if (BUSINESS_TYPE_AWARD.equals(instance.getBusinessType())) {
             AwardApplication application = awardApplicationRepository.findById(instance.getBusinessId()).orElse(null);
             if (application != null) {
-                message.setApplicantName(application.getStudentName() != null ? application.getStudentName() : receiver.getRealName());
+                message.setApplicantName(application.getStudentName() != null ? application.getStudentName() : resolveDisplayName(receiver));
                 message.setApplicationType(application.getApplicationType());
                 message.setAwardName(application.getAwardName());
                 message.setAmount(application.getAmount());
@@ -445,7 +420,7 @@ public class ApprovalServiceImpl implements ApprovalService {
         if (BUSINESS_TYPE_LEAVE.equals(instance.getBusinessType())) {
             LeaveApplication application = leaveApplicationRepository.findById(instance.getBusinessId()).orElse(null);
             if (application != null) {
-                message.setApplicantName(application.getStudentName() != null ? application.getStudentName() : receiver.getRealName());
+                message.setApplicantName(application.getStudentName() != null ? application.getStudentName() : resolveDisplayName(receiver));
                 message.setApplicationType(BUSINESS_TYPE_LEAVE);
                 message.setAwardName(LeaveTypeEnum.getDescriptionByCode(application.getLeaveType()));
                 message.setLeaveStartDate(application.getStartDate());
@@ -454,6 +429,16 @@ public class ApprovalServiceImpl implements ApprovalService {
                 message.setLeaveReason(application.getReason());
             }
         }
+    }
+
+    private String resolveDisplayName(Admin admin) {
+        if (admin == null) {
+            return "系统";
+        }
+        return teacherRepository.findById(admin.getTeacherId())
+                .map(Teacher::getName)
+                .filter(name -> !name.isBlank())
+                .orElse(admin.getNick());
     }
 
     private String resolveBusinessName(String businessType) {

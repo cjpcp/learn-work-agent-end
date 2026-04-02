@@ -32,9 +32,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-/**
- * 奖助申请服务
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -54,9 +51,6 @@ public class AwardApplicationService {
     private final ApprovalService approvalService;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 提交奖助申请
-     */
     @Transactional
     public AwardApplication submitAwardApplication(Long applicantId, AwardApplicationRequest request) {
         log.info("提交申请，用户ID: {}, 申请类型: {}, 奖项名称: {}, 金额: {}, 理由: {}",
@@ -69,11 +63,6 @@ public class AwardApplicationService {
         return savedApplication;
     }
 
-    /**
-     * 材料预审意见
-     *
-     * @param applicationId 奖助申请id
-     */
     @Async
     public void preCheckMaterialsAsync(Long applicationId) {
         try {
@@ -86,19 +75,9 @@ public class AwardApplicationService {
         }
     }
 
-    /**
-     * 审批奖助申请
-     *
-     * @param applicationId 奖助申请id
-     * @param approverId 审批人id
-     * @param approvalStatus 审批状态
-     * @param approvalComment 审批意见
-     */
     @Transactional
-    public void approveAwardApplication(Long applicationId, Long approverId,
-                                        String approvalStatus, String approvalComment) {
+    public void approveAwardApplication(Long applicationId, Long approverId, String approvalStatus, String approvalComment) {
         AwardApplication application = getApplicationById(applicationId);
-
         if (!MATERIAL_STATUS_PASSED.equals(application.getMaterialStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "材料预审未通过，无法审批");
         }
@@ -108,55 +87,32 @@ public class AwardApplicationService {
         approvalService.processApprovalTask(currentTask.getId(), approverId, approvalStatus, approvalComment);
     }
 
-    /**
-     * 获取申请详情
-     */
     public AwardApplication getApplicationById(Long applicationId) {
         return awardApplicationRepository.findById(applicationId)
                 .orElseThrow(() -> new BusinessException(ResultCode.AWARD_APPLICATION_NOT_FOUND));
     }
 
-    /**
-     * 分页查询用户的奖助申请
-     *
-     * @param userId 用户id
-     * @param pageRequest 分页查询参数
-     * @return 奖助申请分页查询结果
-     */
     public PageResult<AwardApplication> getUserApplications(Long userId, PageRequest pageRequest) {
         Pageable pageable = buildPageable(pageRequest);
-        Page<AwardApplication> page = awardApplicationRepository
-                .findByApplicantIdAndDeletedFalseOrderByCreateTimeDesc(userId, pageable);
+        Page<AwardApplication> page = awardApplicationRepository.findByApplicantIdAndDeletedFalseOrderByCreateTimeDesc(userId, pageable);
         return buildPageResult(page, pageRequest);
     }
 
-    /**
-     * 分页查询待审批的申请（审批人）
-     */
     public PageResult<AwardApplication> getPendingApplications(Long approverId, PageRequest pageRequest) {
         Pageable pageable = buildPageable(pageRequest);
         List<Long> applicationIds = approvalService.getPendingTasks(approverId).stream()
                 .map(task -> task.getInstance().getBusinessId())
                 .filter(Objects::nonNull)
                 .distinct()
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
 
-        Page<AwardApplication> page;
-        if (applicationIds.isEmpty()) {
-            page = Page.empty(pageable);
-        } else {
-            page = awardApplicationRepository.findAll(buildPendingApplicationsSpecification(applicationIds), pageable);
-        }
+        Page<AwardApplication> page = applicationIds.isEmpty()
+                ? Page.empty(pageable)
+                : awardApplicationRepository.findAll(buildPendingApplicationsSpecification(applicationIds), pageable);
 
         return buildPageResult(page, pageRequest);
     }
 
-    /**
-     * 检查材料完整性
-     *
-     * @param application 具体的奖助学金申请
-     * @return 材料是否完整
-     */
     private boolean checkMaterialsComplete(AwardApplication application) {
         if (isBlank(application.getReason()) || isBlank(application.getAttachmentUrls())) {
             return false;
@@ -165,14 +121,13 @@ public class AwardApplicationService {
         List<String> fileUrls = Stream.of(application.getAttachmentUrls().split(","))
                 .map(String::trim)
                 .filter(url -> !url.isEmpty())
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
         if (fileUrls.isEmpty()) {
             return false;
         }
 
         try {
-            Map<String, Object> result = difyWorkflowService.identifyDocuments(fileUrls)
-                    .block(MATERIAL_CHECK_TIMEOUT);
+            Map<String, Object> result = difyWorkflowService.identifyDocuments(fileUrls).block(MATERIAL_CHECK_TIMEOUT);
             log.info("Dify工作流识别结果: {}", result);
             return switch (application.getApplicationType()) {
                 case "SCHOLARSHIP" -> checkScholarshipMaterials(result);
@@ -185,9 +140,6 @@ public class AwardApplicationService {
         }
     }
 
-    /**
-     * 检查奖学金材料是否提供
-     */
     private boolean checkScholarshipMaterials(Map<String, Object> result) {
         String output = readWorkflowOutput(result);
         boolean hasTranscript = output.contains("成绩单");
@@ -196,9 +148,6 @@ public class AwardApplicationService {
         return hasTranscript && hasRecommendation;
     }
 
-    /**
-     * 检查助学金材料是否提供
-     */
     private boolean checkGrantMaterials(Map<String, Object> result) {
         String output = readWorkflowOutput(result);
         boolean hasFamilyProof = output.contains("家庭情况证明");
@@ -218,9 +167,6 @@ public class AwardApplicationService {
         application.setMaterialStatus(MATERIAL_STATUS_PENDING);
         application.setApprovalStatus(ApprovalStatusEnum.PENDING.getCode());
         application.setStudentName(request.getStudentName());
-        application.setDepartmentId(request.getDepartmentId());
-        application.setGrade(request.getGrade());
-        application.setClassName(request.getClassName());
         return application;
     }
 
@@ -238,10 +184,7 @@ public class AwardApplicationService {
     }
 
     private Map<String, Object> buildApplicantInfo(AwardApplicationRequest request) {
-        Map<String, Object> applicantInfo = new HashMap<>(5);
-        applicantInfo.put("departmentId", request.getDepartmentId());
-        applicantInfo.put("grade", request.getGrade());
-        applicantInfo.put("className", request.getClassName());
+        Map<String, Object> applicantInfo = new HashMap<>(2);
         applicantInfo.put("studentName", request.getStudentName());
         applicantInfo.put("applicationType", request.getApplicationType());
         return applicantInfo;
@@ -286,12 +229,7 @@ public class AwardApplicationService {
     }
 
     private PageResult<AwardApplication> buildPageResult(Page<AwardApplication> page, PageRequest pageRequest) {
-        return new PageResult<>(
-                page.getContent(),
-                page.getTotalElements(),
-                pageRequest.getPageNum(),
-                pageRequest.getPageSize()
-        );
+        return new PageResult<>(page.getContent(), page.getTotalElements(), pageRequest.getPageNum(), pageRequest.getPageSize());
     }
 
     private Specification<AwardApplication> buildPendingApplicationsSpecification(List<Long> applicationIds) {

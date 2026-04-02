@@ -6,9 +6,6 @@ import lombok.Data;
 
 import java.time.LocalDate;
 
-/**
- * 请假申请请求DTO
- */
 @Data
 public class LeaveApplicationRequest {
 
@@ -26,10 +23,4 @@ public class LeaveApplicationRequest {
     private String attachmentUrl;
 
     private String studentName;
-
-    private Long departmentId;
-
-    private String grade;
-
-    private String className;
 }

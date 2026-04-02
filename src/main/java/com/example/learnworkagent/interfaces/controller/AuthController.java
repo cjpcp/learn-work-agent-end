@@ -3,7 +3,7 @@ package com.example.learnworkagent.interfaces.controller;
 import com.example.learnworkagent.common.Result;
 import com.example.learnworkagent.common.dto.LoginRequest;
 import com.example.learnworkagent.common.dto.LoginResponse;
-import com.example.learnworkagent.domain.user.entity.User;
+import com.example.learnworkagent.common.dto.RegisterRequest;
 import com.example.learnworkagent.domain.user.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,53 +22,21 @@ public class AuthController extends BaseController {
 
     private final AuthService authService;
 
-    /**
-     * 用户登录
-     *
-     * @param request 用户名，密码封装
-     * @return token，userId等信息
-     */
     @Operation(summary = "用户登录")
     @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse response = authService.login(request);
-        return Result.success(response);
+        return Result.success(authService.login(request));
     }
 
-    /**
-     * 用户注册
-     *
-     * @param user 用户名，密码，真实姓名，学号，手机号，邮箱，角色等用户信息
-     * @return 注册成功的用户信息
-     */
     @Operation(summary = "用户注册")
     @PostMapping("/register")
-    public Result<User> register(@RequestBody User user) {
-        User registered = authService.register(
-                user.getUsername(),
-                user.getPassword(),
-                user.getRealName(),
-                user.getStudentNo(),
-                user.getPhone(),
-                user.getEmail(),
-                user.getRole() != null ? user.getRole() : null,
-                user.getDepartmentId(),
-                user.getGrade(),
-                user.getClassName()
-        );
-        return Result.success(registered);
+    public Result<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return Result.success(authService.register(request));
     }
 
-    /**
-     * 检查学号/工号是否存在
-     *
-     * @param studentNo 学号/工号
-     * @return 是否存在
-     */
-    @Operation(summary = "检查学号/工号是否存在")
-    @GetMapping("/check-student-no")
-    public Result<Boolean> checkStudentNo(@RequestParam String studentNo) {
-        boolean exists = authService.checkStudentNoExists(studentNo);
-        return Result.success(exists);
+    @Operation(summary = "检查用户名是否存在")
+    @GetMapping("/check-username")
+    public Result<Boolean> checkUsername(@RequestParam String username) {
+        return Result.success(authService.checkUsernameExists(username));
     }
 }

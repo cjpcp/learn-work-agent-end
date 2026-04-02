@@ -1,7 +1,7 @@
 package com.example.learnworkagent.domain.user.service.impl;
 
-import com.example.learnworkagent.domain.user.entity.User;
-import com.example.learnworkagent.domain.user.repository.UserRepository;
+import com.example.learnworkagent.domain.user.entity.Admin;
+import com.example.learnworkagent.domain.user.repository.AdminRepository;
 import com.example.learnworkagent.domain.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,15 +15,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    private final UserRepository userRepository;
+    private final AdminRepository adminRepository;
 
     @Override
-    public List<User> findAll() {
-        return userRepository.findAll();
+    public List<Admin> findAll() {
+        return adminRepository.findAll();
     }
 
     @Override
-    public List<User> findByDepartmentIdAndRole(Long workDepartmentId, String role) {
-        return userRepository.findByDepartmentIdAndRole(workDepartmentId, role);
+    public List<Admin> findByRoleId(Long roleId) {
+        return adminRepository.findByRoleId(roleId);
     }
 }

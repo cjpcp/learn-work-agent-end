@@ -17,7 +17,6 @@ import com.example.learnworkagent.infrastructure.external.template.TemplateServi
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -192,7 +191,7 @@ public class LeaveApplicationService {
                 .map(task -> task.getInstance().getBusinessId())
                 .filter(Objects::nonNull)
                 .distinct()
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
 
         Page<LeaveApplication> page;
         if (applicationIds.isEmpty()) {
@@ -228,9 +227,6 @@ public class LeaveApplicationService {
         application.setReason(request.getReason());
         application.setAttachmentUrl(request.getAttachmentUrl());
         application.setStudentName(request.getStudentName());
-        application.setDepartmentId(request.getDepartmentId());
-        application.setGrade(request.getGrade());
-        application.setClassName(request.getClassName());
         application.setApprovalStatus(ApprovalStatusEnum.PENDING.getCode());
         application.setLeaveSlipStatus(LeaveSlipStatusEnum.NOT_GENERATED.getCode());
         return application;
@@ -246,11 +242,8 @@ public class LeaveApplicationService {
     }
 
     private Map<String, Object> buildApplicantInfo(LeaveApplicationRequest request) {
-        Map<String, Object> applicantInfo = new HashMap<>(4);
+        Map<String, Object> applicantInfo = new HashMap<>(1);
         applicantInfo.put("studentName", request.getStudentName());
-        applicantInfo.put("departmentId", request.getDepartmentId());
-        applicantInfo.put("grade", request.getGrade());
-        applicantInfo.put("className", request.getClassName());
         return applicantInfo;
     }
 
@@ -270,7 +263,7 @@ public class LeaveApplicationService {
         final String fileName = LEAVE_SLIP_FILE_PREFIX + application.getId() + LEAVE_SLIP_FILE_SUFFIX;
         return new MultipartFile() {
             @Override
-            public @NotNull String getName() {
+            public String getName() {
                 return fileName;
             }
 
@@ -295,17 +288,17 @@ public class LeaveApplicationService {
             }
 
             @Override
-            public byte @NotNull [] getBytes() {
+            public byte[] getBytes() {
                 return docBytes;
             }
 
             @Override
-            public @NotNull InputStream getInputStream() {
+            public InputStream getInputStream() {
                 return new ByteArrayInputStream(docBytes);
             }
 
             @Override
-            public void transferTo(@NotNull File dest) throws IOException {
+            public void transferTo(File dest) throws IOException {
                 Files.write(dest.toPath(), docBytes);
             }
         };

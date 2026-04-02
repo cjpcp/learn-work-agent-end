@@ -3,7 +3,6 @@ package com.example.learnworkagent.domain.process.service;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
 import com.example.learnworkagent.common.enums.NotificationBusinessTypeEnum;
-import com.example.learnworkagent.common.enums.RoleEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
 import com.example.learnworkagent.domain.approval.repository.ApprovalTaskRepository;
@@ -13,7 +12,9 @@ import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.repository.LeaveApplicationRepository;
 import com.example.learnworkagent.domain.process.dto.ProcessItem;
 import com.example.learnworkagent.domain.process.dto.ProcessListResponse;
-import com.example.learnworkagent.domain.user.entity.User;
+import com.example.learnworkagent.domain.user.entity.Admin;
+import com.example.learnworkagent.domain.user.entity.Role;
+import com.example.learnworkagent.domain.user.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -36,22 +37,25 @@ public class ProcessService {
     private static final String AWARD_APPLICATION_NAME = "奖助申请";
     private static final String LEAVE_APPROVAL_NAME = "请假审批";
     private static final String AWARD_APPROVAL_NAME = "奖助审批";
+    private static final List<String> STAFF_ROLE_NAMES = List.of("COUNSELOR", "COLLEGE_LEADER", "DEPARTMENT_LEADER", "ADMIN");
 
     private final LeaveApplicationRepository leaveApplicationRepository;
     private final AwardApplicationRepository awardApplicationRepository;
     private final ApprovalTaskRepository approvalTaskRepository;
+    private final RoleRepository roleRepository;
 
-    public ProcessListResponse getProcessList(User user) {
+    public ProcessListResponse getProcessList(Admin admin) {
         ProcessListResponse response = new ProcessListResponse();
         List<ProcessItem> pending = new ArrayList<>();
         List<ProcessItem> completed = new ArrayList<>();
+        String roleName = getRoleName(admin);
 
-        if (RoleEnum.STUDENT.getCode().equals(user.getRole())) {
-            fillStudentPendingProcesses(user, pending);
-        } else if (isStaffRole(user)) {
-            fillStaffPendingTasks(user, pending);
+        if (isStudentRole(roleName)) {
+            fillStudentPendingProcesses(admin, pending);
+        } else if (isStaffRole(roleName)) {
+            fillStaffPendingTasks(admin, pending);
         } else {
-            throw new BusinessException(ResultCode.PARAM_ERROR, "出现未知的审批角色: " + user.getRole());
+            throw new BusinessException(ResultCode.PARAM_ERROR, "出现未知的审批角色: " + roleName);
         }
 
         response.setPending(pending);
@@ -59,13 +63,6 @@ public class ProcessService {
         return response;
     }
 
-    /**
-     * 获取流程详情
-     *
-     * @param id 流程id
-     * @param type 流程类型（请假或奖助）
-     * @return 流程详情
-     */
     public ProcessItem getProcessDetail(String id, String type) {
         if (PROCESS_TYPE_LEAVE.equals(type)) {
             return buildLeaveProcessDetail(id);
@@ -76,58 +73,42 @@ public class ProcessService {
         throw new BusinessException(ResultCode.PARAM_ERROR, "未知的流程类型: " + type);
     }
 
-    public List<ProcessItem> getCompletedProcesses(User user) {
+    public List<ProcessItem> getCompletedProcesses(Admin admin) {
         List<ProcessItem> completed = new ArrayList<>();
+        String roleName = getRoleName(admin);
 
-        if (RoleEnum.STUDENT.getCode().equals(user.getRole())) {
-            fillStudentCompletedProcesses(user, completed);
-        } else if (isStaffRole(user)) {
-            fillStaffCompletedTasks(user, completed);
+        if (isStudentRole(roleName)) {
+            fillStudentCompletedProcesses(admin, completed);
+        } else if (isStaffRole(roleName)) {
+            fillStaffCompletedTasks(admin, completed);
         }
 
         return completed;
     }
 
-    private void fillStudentPendingProcesses(User user, List<ProcessItem> pending) {
-        var pendingLeaveApps = leaveApplicationRepository
-                .findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(
-                        user.getId(), ApprovalStatusEnum.PENDING.getCode(), PageRequest.of(0, PROCESS_PAGE_SIZE)
-                );
+    private void fillStudentPendingProcesses(Admin admin, List<ProcessItem> pending) {
+        var pendingLeaveApps = leaveApplicationRepository.findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(
+                admin.getId(), ApprovalStatusEnum.PENDING.getCode(), PageRequest.of(0, PROCESS_PAGE_SIZE)
+        );
         for (LeaveApplication application : pendingLeaveApps.getContent()) {
-            pending.add(buildStudentApplicationItem(
-                    application.getId(),
-                    LEAVE_APPLICATION_NAME,
-                    PROCESS_TYPE_LEAVE,
-                    application.getCreateTime().format(DATE_TIME_FORMATTER),
-                    PROCESS_STATUS_PENDING,
-                    "您的请假申请正在审批中"
-            ));
+            pending.add(buildProcessItem(application.getId(), LEAVE_APPLICATION_NAME, PROCESS_TYPE_LEAVE,
+                    application.getCreateTime().format(DATE_TIME_FORMATTER), PROCESS_STATUS_PENDING, "您的请假申请正在审批中"));
         }
 
-        var pendingAwardApps = awardApplicationRepository
-                .findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(
-                        user.getId(), ApprovalStatusEnum.PENDING.getCode(), PageRequest.of(0, PROCESS_PAGE_SIZE)
-                );
+        var pendingAwardApps = awardApplicationRepository.findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(
+                admin.getId(), ApprovalStatusEnum.PENDING.getCode(), PageRequest.of(0, PROCESS_PAGE_SIZE)
+        );
         for (AwardApplication application : pendingAwardApps.getContent()) {
-            pending.add(buildStudentApplicationItem(
-                    application.getId(),
-                    AWARD_APPLICATION_NAME,
-                    PROCESS_TYPE_AWARD,
-                    application.getCreateTime().format(DATE_TIME_FORMATTER),
-                    PROCESS_STATUS_PENDING,
-                    "您的奖助申请正在审批中"
-            ));
+            pending.add(buildProcessItem(application.getId(), AWARD_APPLICATION_NAME, PROCESS_TYPE_AWARD,
+                    application.getCreateTime().format(DATE_TIME_FORMATTER), PROCESS_STATUS_PENDING, "您的奖助申请正在审批中"));
         }
     }
 
-    private void fillStaffPendingTasks(User user, List<ProcessItem> pending) {
-        List<ApprovalTask> pendingTasks = approvalTaskRepository.findByApproverIdAndStatus(
-                user.getId(), ApprovalStatusEnum.PROCESSING.getCode()
-        );
-
+    private void fillStaffPendingTasks(Admin admin, List<ProcessItem> pending) {
+        List<ApprovalTask> pendingTasks = approvalTaskRepository.findByApproverIdAndStatus(admin.getId(), ApprovalStatusEnum.PROCESSING.getCode());
         for (ApprovalTask task : pendingTasks) {
             boolean leaveBusiness = NotificationBusinessTypeEnum.LEAVE.getCode().equals(task.getInstance().getBusinessType());
-            pending.add(buildStudentApplicationItem(
+            pending.add(buildProcessItem(
                     task.getInstance().getBusinessId(),
                     leaveBusiness ? LEAVE_APPROVAL_NAME : AWARD_APPROVAL_NAME,
                     task.getInstance().getBusinessType().toLowerCase(),
@@ -143,15 +124,10 @@ public class ProcessService {
         if (application == null) {
             return new ProcessItem();
         }
-
-        return buildStudentApplicationItem(
-                application.getId(),
-                LEAVE_APPROVAL_NAME,
-                PROCESS_TYPE_LEAVE,
+        return buildProcessItem(
+                application.getId(), LEAVE_APPROVAL_NAME, PROCESS_TYPE_LEAVE,
                 application.getCreateTime().format(DATE_TIME_FORMATTER),
-                ApprovalStatusEnum.PENDING.getCode().equals(application.getApprovalStatus())
-                        ? PROCESS_STATUS_PENDING
-                        : PROCESS_STATUS_COMPLETED,
+                ApprovalStatusEnum.PENDING.getCode().equals(application.getApprovalStatus()) ? PROCESS_STATUS_PENDING : PROCESS_STATUS_COMPLETED,
                 "用户的请假申请"
         );
     }
@@ -161,65 +137,48 @@ public class ProcessService {
         if (application == null) {
             return new ProcessItem();
         }
-
-        return buildStudentApplicationItem(
-                application.getId(),
-                "奖助学金审批",
-                PROCESS_TYPE_AWARD,
+        return buildProcessItem(
+                application.getId(), "奖助学金审批", PROCESS_TYPE_AWARD,
                 application.getCreateTime().format(DATE_TIME_FORMATTER),
-                application.getApprovalStatus(),
-                "用户的奖助学金申请"
+                application.getApprovalStatus(), "用户的奖助学金申请"
         );
     }
 
-    private void fillStudentCompletedProcesses(User user, List<ProcessItem> completed) {
-        appendStudentCompletedLeaveProcesses(user, completed, ApprovalStatusEnum.APPROVED.getCode(), "您的请假申请已批准");
-        appendStudentCompletedLeaveProcesses(user, completed, ApprovalStatusEnum.REJECTED.getCode(), "您的请假申请已拒绝");
-        appendStudentCompletedAwardProcesses(user, completed, ApprovalStatusEnum.APPROVED.getCode(), "您的奖助申请已批准");
-        appendStudentCompletedAwardProcesses(user, completed, ApprovalStatusEnum.REJECTED.getCode(), "您的奖助申请已拒绝");
+    private void fillStudentCompletedProcesses(Admin admin, List<ProcessItem> completed) {
+        appendStudentCompletedLeaveProcesses(admin, completed, ApprovalStatusEnum.APPROVED.getCode(), "您的请假申请已批准");
+        appendStudentCompletedLeaveProcesses(admin, completed, ApprovalStatusEnum.REJECTED.getCode(), "您的请假申请已拒绝");
+        appendStudentCompletedAwardProcesses(admin, completed, ApprovalStatusEnum.APPROVED.getCode(), "您的奖助申请已批准");
+        appendStudentCompletedAwardProcesses(admin, completed, ApprovalStatusEnum.REJECTED.getCode(), "您的奖助申请已拒绝");
     }
 
-    private void appendStudentCompletedLeaveProcesses(User user, List<ProcessItem> completed, String status, String description) {
+    private void appendStudentCompletedLeaveProcesses(Admin admin, List<ProcessItem> completed, String status, String description) {
         var applications = leaveApplicationRepository.findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(
-                user.getId(), status, PageRequest.of(0, PROCESS_PAGE_SIZE)
+                admin.getId(), status, PageRequest.of(0, PROCESS_PAGE_SIZE)
         );
         for (LeaveApplication application : applications.getContent()) {
-            completed.add(buildStudentApplicationItem(
-                    application.getId(),
-                    LEAVE_APPLICATION_NAME,
-                    PROCESS_TYPE_LEAVE,
-                    application.getCreateTime().format(DATE_TIME_FORMATTER),
-                    PROCESS_STATUS_COMPLETED,
-                    description
-            ));
+            completed.add(buildProcessItem(application.getId(), LEAVE_APPLICATION_NAME, PROCESS_TYPE_LEAVE,
+                    application.getCreateTime().format(DATE_TIME_FORMATTER), PROCESS_STATUS_COMPLETED, description));
         }
     }
 
-    private void appendStudentCompletedAwardProcesses(User user, List<ProcessItem> completed, String status, String description) {
+    private void appendStudentCompletedAwardProcesses(Admin admin, List<ProcessItem> completed, String status, String description) {
         var applications = awardApplicationRepository.findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(
-                user.getId(), status, PageRequest.of(0, PROCESS_PAGE_SIZE)
+                admin.getId(), status, PageRequest.of(0, PROCESS_PAGE_SIZE)
         );
         for (AwardApplication application : applications.getContent()) {
-            completed.add(buildStudentApplicationItem(
-                    application.getId(),
-                    AWARD_APPLICATION_NAME,
-                    PROCESS_TYPE_AWARD,
-                    application.getCreateTime().format(DATE_TIME_FORMATTER),
-                    PROCESS_STATUS_COMPLETED,
-                    description
-            ));
+            completed.add(buildProcessItem(application.getId(), AWARD_APPLICATION_NAME, PROCESS_TYPE_AWARD,
+                    application.getCreateTime().format(DATE_TIME_FORMATTER), PROCESS_STATUS_COMPLETED, description));
         }
     }
 
-    private void fillStaffCompletedTasks(User user, List<ProcessItem> completed) {
+    private void fillStaffCompletedTasks(Admin admin, List<ProcessItem> completed) {
         List<ApprovalTask> completedTasks = approvalTaskRepository.findByApproverIdAndStatusIn(
-                user.getId(),
-                List.of(ApprovalStatusEnum.APPROVED.getCode(), ApprovalStatusEnum.REJECTED.getCode())
+                admin.getId(), List.of(ApprovalStatusEnum.APPROVED.getCode(), ApprovalStatusEnum.REJECTED.getCode())
         );
         for (ApprovalTask task : completedTasks) {
             boolean leaveBusiness = NotificationBusinessTypeEnum.LEAVE.getCode().equals(task.getInstance().getBusinessType());
             String statusText = ApprovalStatusEnum.APPROVED.getCode().equals(task.getStatus()) ? "已批准" : "已拒绝";
-            completed.add(buildStudentApplicationItem(
+            completed.add(buildProcessItem(
                     task.getInstance().getBusinessId(),
                     leaveBusiness ? LEAVE_APPROVAL_NAME : AWARD_APPROVAL_NAME,
                     task.getInstance().getBusinessType().toLowerCase(),
@@ -230,8 +189,7 @@ public class ProcessService {
         }
     }
 
-    private ProcessItem buildStudentApplicationItem(Long id, String name, String type, String createTime,
-                                                    String status, String description) {
+    private ProcessItem buildProcessItem(Long id, String name, String type, String createTime, String status, String description) {
         ProcessItem item = new ProcessItem();
         item.setId(String.valueOf(id));
         item.setName(name);
@@ -242,9 +200,18 @@ public class ProcessService {
         return item;
     }
 
-    private boolean isStaffRole(User user) {
-        return RoleEnum.COUNSELOR.getCode().equals(user.getRole())
-                || RoleEnum.COLLEGE_LEADER.getCode().equals(user.getRole())
-                || RoleEnum.DEPARTMENT_LEADER.getCode().equals(user.getRole());
+    private String getRoleName(Admin admin) {
+        if (admin == null || admin.getRoleId() == null) {
+            return "";
+        }
+        return roleRepository.findById(admin.getRoleId()).map(Role::getRoleName).orElse("");
+    }
+
+    private boolean isStudentRole(String roleName) {
+        return "STUDENT".equals(roleName);
+    }
+
+    private boolean isStaffRole(String roleName) {
+        return STAFF_ROLE_NAMES.contains(roleName);
     }
 }

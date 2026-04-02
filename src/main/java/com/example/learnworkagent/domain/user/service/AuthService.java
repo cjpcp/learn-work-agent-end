@@ -1,21 +1,25 @@
 package com.example.learnworkagent.domain.user.service;
 
+import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.dto.LoginRequest;
 import com.example.learnworkagent.common.dto.LoginResponse;
-import com.example.learnworkagent.common.enums.RoleEnum;
-import com.example.learnworkagent.common.enums.UserStatusEnum;
+import com.example.learnworkagent.common.dto.RegisterRequest;
 import com.example.learnworkagent.common.exception.BusinessException;
-import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.util.JwtUtil;
 import com.example.learnworkagent.common.util.RsaUtil;
-import com.example.learnworkagent.domain.user.entity.Department;
-import com.example.learnworkagent.domain.user.entity.User;
-import com.example.learnworkagent.domain.user.repository.UserRepository;
+import com.example.learnworkagent.domain.user.entity.Admin;
+import com.example.learnworkagent.domain.user.entity.Role;
+import com.example.learnworkagent.domain.user.entity.Teacher;
+import com.example.learnworkagent.domain.user.repository.AdminRepository;
+import com.example.learnworkagent.domain.user.repository.RoleRepository;
+import com.example.learnworkagent.domain.user.repository.TeacherRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 /**
  * 认证服务
@@ -25,103 +29,102 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final UserRepository userRepository;
+    private final AdminRepository adminRepository;
+    private final TeacherRepository teacherRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final RsaUtil rsaUtil;
-    private final DepartmentService departmentService;
 
-
-    /**
-     * 登录
-     *
-     * @param request 学号/工号和密码
-     * @return token和用户具体信息
-     */
     public LoginResponse login(LoginRequest request) {
+        Admin admin = adminRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "用户名或密码错误"));
 
-        //根据学号/工号查找用户，如果不存在则抛出异常
-        User user = userRepository.findByStudentNoAndDeletedFalse(request.getStudentNo())
-                .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "学号/工号或密码错误"));
-
-        //非活跃用户判断，如果是非活跃用户抛出异常
-        if (user.getStatus() != UserStatusEnum.ACTIVE) {
-            throw new BusinessException(ResultCode.UNAUTHORIZED, "用户已被禁用");
+        if (!admin.isEnabled()) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED, "账户已被禁用");
         }
 
-        // 解密密码（前端RSA加密传输）
+        Teacher teacher = teacherRepository.findById(admin.getTeacherId())
+                .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "账户关联教师不存在"));
+        if (!teacher.isEnabled()) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED, "教师已被禁用");
+        }
+
+        Role role = roleRepository.findById(admin.getRoleId())
+                .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "账户角色不存在"));
+
+        String decryptedPassword = rsaUtil.decrypt(request.getPassword());
+        if (!passwordEncoder.matches(decryptedPassword, admin.getPassword())) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED, "用户名或密码错误");
+        }
+
+        admin.setLoginTime(LocalDateTime.now());
+        adminRepository.save(admin);
+
+        String token = jwtUtil.generateToken(admin.getId(), admin.getUsername(), role.getRoleName());
+        return new LoginResponse(
+                token,
+                admin.getId(),
+                admin.getUsername(),
+                admin.getNick(),
+                teacher.getId(),
+                teacher.getName(),
+                role.getId(),
+                role.getRoleName(),
+                admin.getStatus()
+        );
+    }
+
+    @Transactional
+    public LoginResponse register(RegisterRequest request) {
+        if (adminRepository.existsByUsername(request.getUsername())) {
+            throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "用户名已存在");
+        }
+
+        Role role = roleRepository.findById(request.getRoleId())
+                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "角色不存在"));
+
         String decryptedPassword = rsaUtil.decrypt(request.getPassword());
 
-        //验证用户密码，不正确抛出异常
-        if (!passwordEncoder.matches(decryptedPassword, user.getPassword())) {
-            throw new BusinessException(ResultCode.UNAUTHORIZED, "学号/工号或密码错误");
-        }
+        Teacher teacher = new Teacher();
+        teacher.setId(null);
+        teacher.setName(request.getTeacherName());
+        teacher.setPhone(request.getPhone());
+        teacher.setCardNumber(request.getCardNumber());
+        teacher.setState(1);
+        int timestamp = (int) (System.currentTimeMillis() / 1000);
+        teacher.setCreateTime(timestamp);
+        teacher.setUpdateTime(timestamp);
+        Teacher savedTeacher = teacherRepository.save(teacher);
 
-        //生成token
-        String token = jwtUtil.generateToken(user.getId(), user.getStudentNo(), user.getRole());
+        Admin admin = new Admin();
+        admin.setId(null);
+        admin.setUsername(request.getUsername());
+        admin.setNick(request.getNick());
+        admin.setPassword(passwordEncoder.encode(decryptedPassword));
+        admin.setRoleId(role.getId());
+        admin.setStatus(1);
+        admin.setTeacherId(savedTeacher.getId());
+        Admin savedAdmin = adminRepository.save(admin);
 
-        //构建登录响应并返回
-        return getLoginResponse(token, user);
+        String token = jwtUtil.generateToken(savedAdmin.getId(), savedAdmin.getUsername(), role.getRoleName());
+        return new LoginResponse(
+                token,
+                savedAdmin.getId(),
+                savedAdmin.getUsername(),
+                savedAdmin.getNick(),
+                savedTeacher.getId(),
+                savedTeacher.getName(),
+                role.getId(),
+                role.getRoleName(),
+                savedAdmin.getStatus()
+        );
     }
 
-    private LoginResponse getLoginResponse(String token, User user) {
-        LoginResponse response = new LoginResponse();
-        response.setToken(token);
-        response.setUserId(user.getId());
-        response.setUsername(user.getStudentNo());
-        response.setRealName(user.getRealName());
-        response.setRole(user.getRole());
-        response.setDepartmentId(user.getDepartmentId());
-        response.setGrade(user.getGrade());
-        response.setClassName(user.getClassName());
-
-        // 仅在需要展示时，通过ID补齐名称（查询全部走ID）
-        if (user.getDepartmentId() != null) {
-            Department dept = departmentService.getDepartmentById(user.getDepartmentId());
-            response.setDepartment(dept.getName());
-        }
-        return response;
-    }
-
-    /**
-     * 注册
-     */
-    @Transactional
-    public User register(String username, String password, String realName,
-                         String studentNo, String phone, String email, String role,
-                         Long departmentId, String grade, String className
-                         ) {
-
-
-
-        if (studentNo != null && !studentNo.trim().isEmpty() && userRepository.findByStudentNoAndDeletedFalse(studentNo).isPresent()) {
-            throw new BusinessException(ResultCode.USER_ALREADY_EXISTS, "学号/工号已存在");
-        }
-
-        // 解密密码（前端RSA加密传输）
-        String decryptedPassword = rsaUtil.decrypt(password);
-
-        User user = new User();
-        user.setUsername(username);
-        System.out.println(passwordEncoder.encode("ADMIN"));
-        user.setPassword(passwordEncoder.encode(decryptedPassword));
-        user.setRealName(realName);
-        user.setStudentNo(studentNo);
-        user.setPhone(phone);
-        user.setEmail(email);
-        user.setRole(role != null ? role : RoleEnum.STUDENT.getCode());
-        user.setStatus(UserStatusEnum.ACTIVE);
-        user.setDepartmentId(departmentId);
-        user.setGrade(grade);
-        user.setClassName(className);
-
-        return userRepository.save(user);
-    }
-
-    public boolean checkStudentNoExists(String studentNo) {
-        if (studentNo == null || studentNo.trim().isEmpty()) {
+    public boolean checkUsernameExists(String username) {
+        if (username == null || username.trim().isEmpty()) {
             return false;
         }
-        return userRepository.findByStudentNoAndDeletedFalse(studentNo).isPresent();
+        return adminRepository.existsByUsername(username.trim());
     }
 }

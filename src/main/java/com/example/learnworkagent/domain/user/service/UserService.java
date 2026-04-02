@@ -1,6 +1,6 @@
 package com.example.learnworkagent.domain.user.service;
 
-import com.example.learnworkagent.domain.user.entity.User;
+import com.example.learnworkagent.domain.user.entity.Admin;
 
 import java.util.List;
 
@@ -10,12 +10,12 @@ import java.util.List;
 public interface UserService {
 
     /**
-     * 获取所有用户
+     * 获取所有账户
      */
-    List<User> findAll();
+    List<Admin> findAll();
 
     /**
-     * 根据工作部门ID和角色查询
+     * 根据角色查询账户
      */
-    List<User> findByDepartmentIdAndRole(Long workDepartmentId, String role);
+    List<Admin> findByRoleId(Long roleId);
 }

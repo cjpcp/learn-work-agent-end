@@ -12,63 +12,21 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class LoginResponse {
 
-    /**
-     * Token
-     */
     private String token;
 
-    /**
-     * 用户ID
-     */
-    private Long userId;
+    private Long adminId;
 
-    /**
-     * 用户名
-     */
     private String username;
 
-    /**
-     * 真实姓名
-     */
-    private String realName;
+    private String nick;
 
-    /**
-     * 角色
-     */
-    private String role;
+    private Long teacherId;
 
-    /**
-     * 院系（学生角色使用）
-     */
-    private String department;
+    private String teacherName;
 
-    /**
-     * 院系ID（学生角色使用）
-     */
-    private Long departmentId;
+    private Long roleId;
 
-    /**
-     * 年级（学生角色使用）
-     */
-    private String grade;
+    private String roleName;
 
-    /**
-     * 班级（学生角色使用）
-     */
-    private String className;
-
-    /**
-     * 所属部门（辅导员/学工角色使用）
-     */
-    private String workDepartment;
-
-    /**
-     * 所属部门ID（辅导员/学工角色使用）
-     */
-    private Long workDepartmentId;
-
-    /**
-     * 职位（辅导员/学工角色使用）
-     */
-    private String position;
+    private Integer status;
 }

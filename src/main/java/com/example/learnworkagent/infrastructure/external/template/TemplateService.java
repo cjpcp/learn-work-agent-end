@@ -2,8 +2,10 @@ package com.example.learnworkagent.infrastructure.external.template;
 
 import com.example.learnworkagent.common.enums.LeaveTypeEnum;
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
-import com.example.learnworkagent.domain.user.entity.User;
-import com.example.learnworkagent.domain.user.repository.UserRepository;
+import com.example.learnworkagent.domain.user.entity.Admin;
+import com.example.learnworkagent.domain.user.entity.Teacher;
+import com.example.learnworkagent.domain.user.repository.AdminRepository;
+import com.example.learnworkagent.domain.user.repository.TeacherRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -20,9 +22,6 @@ import java.io.InputStream;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-/**
- * 模板服务，使用请假模板生成请假条文档。
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -30,21 +29,14 @@ public class TemplateService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月dd日");
 
-    private final UserRepository userRepository;
+    private final AdminRepository adminRepository;
+    private final TeacherRepository teacherRepository;
 
-    /**
-     * 生成请假条 Word 文档（基于请假模板.docx）。
-     *
-     * @param application 请假申请
-     * @return docx 文件字节数组
-     */
     public byte[] generateLeaveSlip(LeaveApplication application) throws Exception {
         ClassPathResource resource = new ClassPathResource("templates/请假模板.docx");
-        try (InputStream inputStream = resource.getInputStream();
-             XWPFDocument document = new XWPFDocument(inputStream)) {
-
+        try (InputStream inputStream = resource.getInputStream(); XWPFDocument document = new XWPFDocument(inputStream)) {
             String applicantName = resolveApplicantName(application);
-            String studentNo = resolveStudentNo(application.getApplicantId());
+            String cardNumber = resolveCardNumber(application.getApplicantId());
             String grade = defaultText(application.getGrade());
             String className = defaultText(application.getClassName());
             String phone = resolvePhone(application.getApplicantId());
@@ -57,8 +49,7 @@ public class TemplateService {
 
             List<XWPFTable> tables = document.getTables();
             if (!tables.isEmpty()) {
-                XWPFTable table = tables.get(0);
-                fillTable(table, applicantName, studentNo, grade, className, phone, leaveType, dateRange, days, reason);
+                fillTable(tables.get(0), applicantName, cardNumber, grade, className, phone, leaveType, dateRange, days, reason);
             }
 
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -67,12 +58,8 @@ public class TemplateService {
         }
     }
 
-    private void fillTable(XWPFTable table,
-                           String name, String studentNo,
-                           String grade, String className,
-                           String phone, String leaveType,
-                           String dateRange, String days,
-                           String reason) {
+    private void fillTable(XWPFTable table, String name, String cardNumber, String grade, String className,
+                           String phone, String leaveType, String dateRange, String days, String reason) {
         int rowCount = table.getNumberOfRows();
         log.info("模板表格行数: {}", rowCount);
 
@@ -80,10 +67,9 @@ public class TemplateService {
             XWPFTableRow row = table.getRow(0);
             setCell(row, 1, name);
             if (row.getTableCells().size() > 3) {
-                setCell(row, 3, studentNo);
+                setCell(row, 3, cardNumber);
             }
         }
-
         if (rowCount > 1) {
             XWPFTableRow row = table.getRow(1);
             setCell(row, 1, grade);
@@ -91,23 +77,19 @@ public class TemplateService {
                 setCell(row, 3, className);
             }
         }
-
         if (rowCount > 2) {
             XWPFTableRow row = table.getRow(2);
-            setCell(row, 1, studentNo);
+            setCell(row, 1, cardNumber);
             if (row.getTableCells().size() > 3) {
                 setCell(row, 3, phone);
             }
         }
-
         if (rowCount > 3) {
             setCell(table.getRow(3), 1, dateRange);
         }
-
         if (rowCount > 4) {
             setCell(table.getRow(4), 1, leaveType + "  " + days);
         }
-
         if (rowCount > 5) {
             XWPFTableRow row = table.getRow(5);
             if (!row.getTableCells().isEmpty()) {
@@ -116,9 +98,7 @@ public class TemplateService {
                 if (!paragraphs.isEmpty()) {
                     clearAndSetParagraph(paragraphs.get(0), reason);
                 } else {
-                    XWPFParagraph paragraph = cell.addParagraph();
-                    XWPFRun run = paragraph.createRun();
-                    run.setText(reason);
+                    cell.addParagraph().createRun().setText(reason);
                 }
             }
         }
@@ -136,9 +116,7 @@ public class TemplateService {
             clearAndSetParagraph(paragraphs.get(0), text);
             return;
         }
-        XWPFParagraph paragraph = cell.addParagraph();
-        XWPFRun run = paragraph.createRun();
-        run.setText(text);
+        cell.addParagraph().createRun().setText(text);
     }
 
     private void clearAndSetParagraph(XWPFParagraph paragraph, String text) {
@@ -157,39 +135,28 @@ public class TemplateService {
         if (application.getStudentName() != null && !application.getStudentName().isBlank()) {
             return application.getStudentName();
         }
-        try {
-            User user = userRepository.findById(application.getApplicantId()).orElse(null);
-            if (user != null && user.getRealName() != null) {
-                return user.getRealName();
-            }
-        } catch (Exception exception) {
-            log.error("获取申请人姓名失败", exception);
-        }
-        return "";
+        return resolveTeacher(application.getApplicantId()).map(Teacher::getName).orElse("");
     }
 
-    private String resolveStudentNo(Long applicantId) {
-        try {
-            User user = userRepository.findById(applicantId).orElse(null);
-            if (user != null && user.getStudentNo() != null) {
-                return user.getStudentNo();
-            }
-        } catch (Exception exception) {
-            log.error("获取学号失败", exception);
-        }
-        return "";
+    private String resolveCardNumber(Long applicantId) {
+        return resolveTeacher(applicantId).map(Teacher::getCardNumber).map(this::defaultText).orElse("");
     }
 
     private String resolvePhone(Long applicantId) {
+        return resolveTeacher(applicantId).map(Teacher::getPhone).map(this::defaultText).orElse("");
+    }
+
+    private java.util.Optional<Teacher> resolveTeacher(Long applicantId) {
         try {
-            User user = userRepository.findById(applicantId).orElse(null);
-            if (user != null && user.getPhone() != null) {
-                return user.getPhone();
+            Admin admin = adminRepository.findById(applicantId).orElse(null);
+            if (admin == null || admin.getTeacherId() == null) {
+                return java.util.Optional.empty();
             }
+            return teacherRepository.findById(admin.getTeacherId());
         } catch (Exception exception) {
-            log.error("获取联系方式失败", exception);
+            log.error("获取申请人教师信息失败", exception);
+            return java.util.Optional.empty();
         }
-        return "";
     }
 
     private String defaultText(String value) {
