@@ -37,7 +37,6 @@ public class ProcessService {
     private static final String AWARD_APPLICATION_NAME = "奖助申请";
     private static final String LEAVE_APPROVAL_NAME = "请假审批";
     private static final String AWARD_APPROVAL_NAME = "奖助审批";
-    private static final List<String> STAFF_ROLE_NAMES = List.of("COUNSELOR", "COLLEGE_LEADER", "DEPARTMENT_LEADER", "ADMIN");
 
     private final LeaveApplicationRepository leaveApplicationRepository;
     private final AwardApplicationRepository awardApplicationRepository;
@@ -50,9 +49,9 @@ public class ProcessService {
         List<ProcessItem> completed = new ArrayList<>();
         String roleName = getRoleName(admin);
 
-        if (isStudentRole(roleName)) {
+        if (isStudent(admin)) {
             fillStudentPendingProcesses(admin, pending);
-        } else if (isStaffRole(roleName)) {
+        } else if (isStaffRole(admin)) {
             fillStaffPendingTasks(admin, pending);
         } else {
             throw new BusinessException(ResultCode.PARAM_ERROR, "出现未知的审批角色: " + roleName);
@@ -75,11 +74,10 @@ public class ProcessService {
 
     public List<ProcessItem> getCompletedProcesses(Admin admin) {
         List<ProcessItem> completed = new ArrayList<>();
-        String roleName = getRoleName(admin);
 
-        if (isStudentRole(roleName)) {
+        if (isStudent(admin)) {
             fillStudentCompletedProcesses(admin, completed);
-        } else if (isStaffRole(roleName)) {
+        } else if (isStaffRole(admin)) {
             fillStaffCompletedTasks(admin, completed);
         }
 
@@ -114,7 +112,8 @@ public class ProcessService {
                     task.getInstance().getBusinessType().toLowerCase(),
                     task.getInstance().getCreateTime().format(DATE_TIME_FORMATTER),
                     PROCESS_STATUS_PENDING,
-                    leaveBusiness ? "学生的请假申请需要您审批" : "学生的奖助申请需要您审批"
+                    leaveBusiness ? "学生的请假申请需要您审批" : "学生的奖助申请需要您审批",
+                    true
             ));
         }
     }
@@ -190,6 +189,10 @@ public class ProcessService {
     }
 
     private ProcessItem buildProcessItem(Long id, String name, String type, String createTime, String status, String description) {
+        return buildProcessItem(id, name, type, createTime, status, description, null);
+    }
+
+    private ProcessItem buildProcessItem(Long id, String name, String type, String createTime, String status, String description, Boolean allowAction) {
         ProcessItem item = new ProcessItem();
         item.setId(String.valueOf(id));
         item.setName(name);
@@ -197,6 +200,7 @@ public class ProcessService {
         item.setCreateTime(createTime);
         item.setStatus(status);
         item.setDescription(description);
+        item.setAllowAction(allowAction);
         return item;
     }
 
@@ -207,11 +211,11 @@ public class ProcessService {
         return roleRepository.findById(admin.getRoleId()).map(Role::getRoleName).orElse("");
     }
 
-    private boolean isStudentRole(String roleName) {
-        return "STUDENT".equals(roleName);
+    private boolean isStudent(Admin admin) {
+        return admin != null && admin.getTeacherId() != null && admin.getTeacherId() == 0;
     }
 
-    private boolean isStaffRole(String roleName) {
-        return STAFF_ROLE_NAMES.contains(roleName);
+    private boolean isStaffRole(Admin admin) {
+        return admin != null && admin.getTeacherId() != null && admin.getTeacherId() != 0;
     }
 }

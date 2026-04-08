@@ -12,10 +12,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Dify聊天服务
@@ -33,6 +31,9 @@ public class DifyChatService {
     @Value("${dify.chat.api-key:app-WVk7LOKCEjRHeoaiPf536xKh}")
     private String chatApiKey;
 
+    @Value("${dify.chat.app-id:}")
+    private String appId;
+
     public DifyChatService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder
                 .build();
@@ -48,6 +49,21 @@ public class DifyChatService {
      * @return 流式响应
      */
     public Flux<String> chatStream(String query, List<String> fileUrls, String conversationId, String user) {
+        return chatStream(query, fileUrls, conversationId, user, null);
+    }
+
+    /**
+     * 调用Dify聊天API进行智能咨询（流式响应），并捕获conversation_id
+     *
+     * @param query          用户问题
+     * @param fileUrls       文件URL列表（可选）
+     * @param conversationId 对话ID（可选）
+     * @param user           用户标识
+     * @param conversationIdConsumer 回调，用于返回conversation_id（可选）
+     * @return 流式响应
+     */
+    public Flux<String> chatStream(String query, List<String> fileUrls, String conversationId, String user,
+                                   Consumer<String> conversationIdConsumer) {
         if (query == null || query.isEmpty()) {
             return Flux.error(new BusinessException(ResultCode.PARAM_ERROR, "问题内容不能为空"));
         }
@@ -63,6 +79,8 @@ public class DifyChatService {
                 fileUrls != null ? fileUrls.size() : 0);
         log.debug("请求体: {}", requestBody);
 
+        final boolean[] conversationIdCaptured = {false};
+
         return webClient.post()
                 .uri(baseUrl + "/v1/chat-messages")
                 .header("Authorization", "Bearer " + chatApiKey)
@@ -72,27 +90,36 @@ public class DifyChatService {
                 .bodyToFlux(String.class)
                 .map(chunk -> {
                     try {
-                        // 处理SSE格式数据，保留内容中的换行符
                         String jsonStr = chunk;
                         if (chunk.startsWith("data:")) {
-                            // 只移除"data:"前缀，不trim以保留内容中的换行和空格
                             jsonStr = chunk.substring(5);
                         }
 
-                        // 跳过[DONE]标记
                         if ("[DONE]".equals(jsonStr)) {
                             return "";
                         }
 
                         JsonNode jsonNode = objectMapper.readTree(jsonStr);
 
-                        // Dify流式响应中，delta.text包含增量内容
+                        if (!conversationIdCaptured[0]) {
+                            JsonNode convIdNode = jsonNode.get("conversation_id");
+                            if (convIdNode != null && !convIdNode.isNull()) {
+                                String convId = convIdNode.asText();
+                                if (convId != null && !convId.isEmpty()) {
+                                    conversationIdCaptured[0] = true;
+                                    if (conversationIdConsumer != null) {
+                                        conversationIdConsumer.accept(convId);
+                                    }
+                                    log.info("捕获到Dify conversation_id: {}", convId);
+                                }
+                            }
+                        }
+
                         JsonNode eventNode = jsonNode.get("event");
                         if (eventNode != null && "message".equals(eventNode.asText())) {
                             JsonNode answerNode = jsonNode.get("answer");
                             if (answerNode != null && answerNode.isTextual()) {
                                 String answer = answerNode.asText();
-                                // 只返回非空的新增内容
                                 if (!answer.isEmpty()) {
                                     return answer;
                                 }
@@ -104,7 +131,6 @@ public class DifyChatService {
                     return "";
                 })
                 .filter(chunk -> !chunk.isEmpty())
-                .distinct() // 去重，防止重复内容
                 .doOnNext(chunk -> log.debug("接收到流式数据chunk: {}", chunk))
                 .doOnComplete(() -> log.info("Dify聊天API调用完成，user: {}", user))
                 .doOnError(error -> {
@@ -126,6 +152,67 @@ public class DifyChatService {
                     }
                     return Flux.error(new BusinessException(ResultCode.SYSTEM_ERROR, "Dify聊天API调用失败: " + error.getMessage()));
                 });
+    }
+
+    /**
+     * 获取对话历史消息
+     *
+     * @param conversationId 对话ID
+     * @param user           用户标识
+     * @return 消息列表
+     */
+    public List<Map<String, Object>> getConversationMessages(String conversationId, String user) {
+        if (conversationId == null || conversationId.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        if (chatApiKey == null || chatApiKey.isEmpty()) {
+            log.warn("Dify Chat API Key未配置");
+            return Collections.emptyList();
+        }
+
+        try {
+            String url = baseUrl + "/v1/messages?conversation_id=" + conversationId + "&user=" + user + "&limit=20";
+
+            log.info("调用Dify获取对话历史，conversation_id: {}, user: {}", conversationId, user);
+
+            String response = webClient.get()
+                    .uri(url)
+                    .header("Authorization", "Bearer " + chatApiKey)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            log.debug("Dify对话历史响应: {}", response);
+
+            List<Map<String, Object>> messages = new ArrayList<>();
+            if (response != null && !response.isEmpty()) {
+                JsonNode rootNode = objectMapper.readTree(response);
+                JsonNode dataNode = rootNode.get("data");
+                if (dataNode != null && dataNode.isArray()) {
+                    for (JsonNode node : dataNode) {
+                        Map<String, Object> msg = new HashMap<>();
+                        msg.put("id", getTextValue(node, "id"));
+                        msg.put("conversation_id", getTextValue(node, "conversation_id"));
+                        msg.put("inputs", node.get("inputs"));
+                        msg.put("query", getTextValue(node, "query"));
+                        msg.put("answer", getTextValue(node, "answer"));
+                        msg.put("message_type", getTextValue(node, "message_type"));
+                        msg.put("created_at", getTextValue(node, "created_at"));
+                        messages.add(msg);
+                    }
+                }
+            }
+            return messages;
+        } catch (Exception e) {
+            log.error("获取Dify对话历史失败，conversation_id: {}", conversationId, e);
+            return Collections.emptyList();
+        }
+    }
+
+    private String getTextValue(JsonNode node, String field) {
+        JsonNode fieldNode = node.get(field);
+        return fieldNode != null && !fieldNode.isNull() ? fieldNode.asText() : null;
     }
 
     /**

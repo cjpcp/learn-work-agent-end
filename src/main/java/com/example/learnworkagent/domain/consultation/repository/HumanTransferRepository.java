@@ -15,14 +15,14 @@ import java.util.List;
 public interface HumanTransferRepository extends JpaRepository<HumanTransfer, Long> {
 
     /**
-     * 根据用户ID分页查询
+     * 根据发起人ID分页查询
      */
     Page<HumanTransfer> findByUserIdAndDeletedFalseOrderByCreateTimeDesc(Long userId, Pageable pageable);
 
     /**
-     * 根据状态分页查询
+     * 根据工作人员ID和状态列表分页查询
      */
-    Page<HumanTransfer> findByStatusInAndDeletedFalseOrderByCreateTimeDesc(List<String> status, Pageable pageable);
+    Page<HumanTransfer> findByStaffIdAndStatusInAndDeletedFalseOrderByCreateTimeDesc(Long staffId, List<String> statuses, Pageable pageable);
 
     /**
      * 根据工作人员ID和状态查询已完成的记录

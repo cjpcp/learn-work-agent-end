@@ -1,6 +1,8 @@
 package com.example.learnworkagent.interfaces.controller;
 
 import com.example.learnworkagent.common.Result;
+import com.example.learnworkagent.common.dto.PageRequest;
+import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.domain.user.entity.Admin;
 import com.example.learnworkagent.domain.user.entity.Role;
 import com.example.learnworkagent.domain.user.entity.Teacher;
@@ -45,18 +47,22 @@ public class SystemController extends BaseController {
         return Result.success(getRoleOptions());
     }
 
-    @Operation(summary = "获取用户列表")
+    @Operation(summary = "分页获取用户列表")
     @GetMapping("/users")
-    public Result<List<Map<String, Object>>> getUsers(@RequestParam(required = false) Long roleId,
-                                                      @RequestParam(required = false) String teacherKeyword) {
-        List<Admin> admins = roleId != null ? userService.findByRoleId(roleId) : userService.findAll();
+    public Result<PageResult<Map<String, Object>>> getUsers(PageRequest pageRequest,
+                                                            @RequestParam(required = false) Long roleId,
+                                                            @RequestParam(required = false) String teacherKeyword,
+                                                            @RequestParam(required = false) String username,
+                                                            @RequestParam(required = false) String nick,
+                                                            @RequestParam(required = false) Integer status) {
+        PageResult<Admin> adminPage = userService.findUsersPage(roleId, username, nick, status, pageRequest);
         String keyword = teacherKeyword == null ? "" : teacherKeyword.trim().toLowerCase();
 
-        List<Map<String, Object>> result = admins.stream()
+        List<Map<String, Object>> result = adminPage.getRecords().stream()
                 .map(this::toUserOption)
                 .filter(item -> keyword.isEmpty() || containsTeacherKeyword(item, keyword))
                 .collect(Collectors.toList());
-        return Result.success(result);
+        return Result.success(new PageResult<>(result, adminPage.getTotal(), adminPage.getPageNum(), adminPage.getPageSize()));
     }
 
     private List<Map<String, Object>> getRoleOptions() {

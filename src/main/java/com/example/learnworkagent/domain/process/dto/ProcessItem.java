@@ -11,4 +11,5 @@ public class ProcessItem {
     private String createTime;
     private String status;
     private String description;
+    private Boolean allowAction;
 }

@@ -6,6 +6,7 @@ import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.domain.consultation.dto.ConsultationRequest;
+import com.example.learnworkagent.domain.consultation.dto.ConversationMessageDTO;
 import com.example.learnworkagent.domain.consultation.dto.TransferToHumanRequest;
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
 import com.example.learnworkagent.domain.consultation.entity.HumanTransfer;
@@ -68,6 +69,13 @@ public class ConsultationController extends BaseController {
     public Result<ConsultationQuestion> getQuestion(@PathVariable Long id) {
         ConsultationQuestion question = consultationService.getQuestionById(id);
         return Result.success(question);
+    }
+
+    @Operation(summary = "获取问题对话历史")
+    @GetMapping("/questions/{id}/history")
+    public Result<List<ConversationMessageDTO>> getQuestionHistory(@PathVariable Long id) {
+        List<ConversationMessageDTO> history = consultationService.getConversationHistory(id);
+        return Result.success(history);
     }
 
     @Operation(summary = "分页查询我的问题")
@@ -362,7 +370,8 @@ public class ConsultationController extends BaseController {
     @Operation(summary = "分页查询工作人员的转接记录")
     @GetMapping("/transfers/staff")
     public Result<PageResult<HumanTransfer>> getStaffTransfers(@Valid PageRequest pageRequest) {
-        PageResult<HumanTransfer> result = humanTransferService.getStaffTransfers(pageRequest);
+        Long staffId = getCurrentUserId();
+        PageResult<HumanTransfer> result = humanTransferService.getStaffTransfers(staffId, pageRequest);
         return Result.success(result);
     }
 

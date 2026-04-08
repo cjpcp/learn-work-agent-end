@@ -7,6 +7,7 @@ import com.example.learnworkagent.common.enums.NotificationBusinessTypeEnum;
 import com.example.learnworkagent.common.enums.NotificationChannelEnum;
 import com.example.learnworkagent.common.enums.NotificationTypeEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
+import com.example.learnworkagent.domain.approval.dto.ApprovalTaskDTO;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.entity.ApprovalProcess;
 import com.example.learnworkagent.domain.approval.entity.ApprovalStep;
@@ -141,8 +142,19 @@ public class ApprovalServiceImpl implements ApprovalService {
     }
 
     @Override
-    public List<ApprovalTask> getPendingTasks(Long approverId) {
-        return taskRepository.findByApproverIdAndStatus(approverId, TASK_PROCESSING);
+    public List<ApprovalTaskDTO> getPendingTasks(Long approverId) {
+        List<ApprovalTask> tasks = taskRepository.findByApproverIdAndStatus(approverId, TASK_PROCESSING);
+        return tasks.stream().map(task -> {
+            ApprovalTaskDTO dto = new ApprovalTaskDTO();
+            dto.setId(task.getId());
+            dto.setBusinessId(task.getInstance().getBusinessId());
+            dto.setBusinessType(task.getInstance().getBusinessType());
+            dto.setStatus(task.getStatus());
+            dto.setCreateTime(task.getCreateTime());
+            dto.setApproverId(task.getApproverId());
+            dto.setStepName(task.getStep().getStepName());
+            return dto;
+        }).toList();
     }
 
     @Override

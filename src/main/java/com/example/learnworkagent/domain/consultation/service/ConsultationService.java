@@ -5,8 +5,10 @@ import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.domain.consultation.dto.ConsultationRequest;
+import com.example.learnworkagent.domain.consultation.dto.ConversationMessageDTO;
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
 import com.example.learnworkagent.domain.consultation.repository.ConsultationQuestionRepository;
+import com.example.learnworkagent.infrastructure.external.dify.DifyChatService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 咨询服务
@@ -29,6 +32,7 @@ public class ConsultationService {
 
     private final ConsultationQuestionRepository consultationQuestionRepository;
     private final ConsultationAgentService consultationAgentService;
+    private final DifyChatService difyChatService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -116,12 +120,54 @@ public class ConsultationService {
      * 查询用户在指定问题之前（含）的历史咨询记录
      */
     public List<ConsultationQuestion> getHistoryByUserIdUpToQuestion(Long userId, Long questionId) {
-        // 优先按 sessionId 查询同一会话，兼容无 sessionId 的老数据
         ConsultationQuestion question = consultationQuestionRepository.findById(questionId).orElse(null);
         if (question != null && question.getSessionId() != null && !question.getSessionId().isBlank()) {
             return consultationQuestionRepository.findBySessionIdOrderByCreateTimeAsc(question.getSessionId());
         }
         return consultationQuestionRepository.findHistoryByUserIdUpToQuestion(userId, questionId);
+    }
+
+    /**
+     * 获取问题的对话历史详情
+     * 如果存在 conversation_id，则从 Dify 获取完整对话历史
+     * 否则返回本地存储的问题信息
+     */
+    public List<ConversationMessageDTO> getConversationHistory(Long questionId) {
+        ConsultationQuestion question = getQuestionById(questionId);
+
+        if (question.getConversationId() != null && !question.getConversationId().isBlank()) {
+            List<Map<String, Object>> messages = difyChatService.getConversationMessages(
+                    question.getConversationId(),
+                    String.valueOf(question.getUserId())
+            );
+
+            return messages.stream().map(this::convertToDTO).toList();
+        }
+
+        return List.of(convertLocalQuestionToDTO(question));
+    }
+
+    private ConversationMessageDTO convertToDTO(Map<String, Object> message) {
+        ConversationMessageDTO dto = new ConversationMessageDTO();
+        dto.setId((String) message.get("id"));
+        dto.setConversationId((String) message.get("conversation_id"));
+        dto.setInputs((Map<String, Object>) message.get("inputs"));
+        dto.setQuery((String) message.get("query"));
+        dto.setAnswer((String) message.get("answer"));
+        dto.setMessageType((String) message.get("message_type"));
+        dto.setCreatedAt((String) message.get("created_at"));
+        return dto;
+    }
+
+    private ConversationMessageDTO convertLocalQuestionToDTO(ConsultationQuestion question) {
+        ConversationMessageDTO dto = new ConversationMessageDTO();
+        dto.setId(String.valueOf(question.getId()));
+        dto.setConversationId(question.getConversationId());
+        dto.setQuery(question.getQuestionText());
+        dto.setAnswer(question.getAiAnswer());
+        dto.setMessageType(question.getQuestionType());
+        dto.setCreatedAt(question.getCreateTime() != null ? question.getCreateTime().toString() : null);
+        return dto;
     }
 
     /**

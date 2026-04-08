@@ -39,6 +39,7 @@ public class ConsultationAgentService {
     private final SpeechToTextService speechToTextService;
     private final CacheService cacheService;
     private final HumanTransferRepository humanTransferRepository;
+    private final HumanTransferConfigService humanTransferConfigService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // 注入自身的代理对象，用于解决事务自调用问题
@@ -94,9 +95,14 @@ public class ConsultationAgentService {
             List<String> fileUrls = resolveFileUrls(question);
             String query = buildQuery(question);
             String prompt = buildPrompt(question, query);
-            log.info("调用Dify AI，问题ID: {}, 文件数: {}", questionId,
+            log.info("调用Dify  AI，问题ID: {}, 文件数: {}", questionId,
                     fileUrls != null ? fileUrls.size() : 0);
-            difyChatService.chatStream(prompt, fileUrls, null, String.valueOf(question.getUserId()))
+            difyChatService.chatStream(prompt, fileUrls, null, String.valueOf(question.getUserId()),
+                    convId -> {
+                        log.info("捕获到conversation_id: {}，保存到问题: {}", convId, questionId);
+                        question.setConversationId(convId);
+                        consultationQuestionRepository.save(question);
+                    })
                     .collectList()
                     .subscribe(
                             answerList -> {
@@ -144,13 +150,19 @@ public class ConsultationAgentService {
         question.setAnswerSource("HUMAN");
         consultationQuestionRepository.save(question);
 
-        // 创建转人工记录（之前缺失此步骤）
         HumanTransfer transfer = new HumanTransfer();
         transfer.setQuestionId(question.getId());
         transfer.setUserId(question.getUserId());
         transfer.setTransferType("AUTO");
         transfer.setTransferReason("问题复杂或包含敏感关键词，需要人工处理");
-        transfer.setStatus("PENDING");
+
+        Long matchedStaffId = humanTransferConfigService.resolveStaffId(question.getCategory());
+        if (matchedStaffId != null) {
+            transfer.setStaffId(matchedStaffId);
+            transfer.setStatus("PROCESSING");
+        } else {
+            transfer.setStatus("PENDING");
+        }
         humanTransferRepository.save(transfer);
 
         log.info("问题已转人工，问题ID: {}, HumanTransfer已创建", question.getId());
@@ -303,8 +315,14 @@ public class ConsultationAgentService {
                     log.info("调用Dify AI，问题ID: {}, 文件数: {}", questionId,
                             fileUrls != null ? fileUrls.size() : 0);
 
+                    ConsultationQuestion questionForCapture = question;
                     return difyChatService.chatStream(prompt, fileUrls, null,
-                                    String.valueOf(question.getUserId()))
+                                    String.valueOf(question.getUserId()),
+                                    convId -> {
+                                        log.info("流式处理捕获到conversation_id: {}，保存到问题: {}", convId, questionId);
+                                        questionForCapture.setConversationId(convId);
+                                        consultationQuestionRepository.save(questionForCapture);
+                                    })
                             //所有数据发送完成时的回调函数
                             .doOnComplete(() -> {
                                 log.info("Dify API调用完成，问题ID: {}", questionId);

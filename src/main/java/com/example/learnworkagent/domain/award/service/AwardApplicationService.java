@@ -6,6 +6,7 @@ import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
 import com.example.learnworkagent.common.enums.NotificationBusinessTypeEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
+import com.example.learnworkagent.domain.approval.dto.ApprovalTaskDTO;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
 import com.example.learnworkagent.domain.approval.service.ApprovalService;
@@ -101,7 +102,7 @@ public class AwardApplicationService {
     public PageResult<AwardApplication> getPendingApplications(Long approverId, PageRequest pageRequest) {
         Pageable pageable = buildPageable(pageRequest);
         List<Long> applicationIds = approvalService.getPendingTasks(approverId).stream()
-                .map(task -> task.getInstance().getBusinessId())
+                .map(ApprovalTaskDTO::getBusinessId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(java.util.stream.Collectors.toList());

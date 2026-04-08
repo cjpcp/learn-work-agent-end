@@ -101,7 +101,14 @@ public class ConsultationQuestion extends BaseEntity {
     private String sessionId;
 
     /**
-     * 附件文件URL列表（JSON数组，存储已上传至OSS的文件URL�?
+     * Dify对话ID（用于从Dify获取对话历史）
+     */
+    @Comment("Dify对话ID")
+    @Column(name = "conversation_id", length = 64)
+    private String conversationId;
+
+    /**
+     * 附件文件URL列表（JSON数组，存储已上传至OSS的文件URL）
      */
     @Comment("附件文件URL列表(JSON)")
     @Column(name = "file_urls", columnDefinition = "TEXT")

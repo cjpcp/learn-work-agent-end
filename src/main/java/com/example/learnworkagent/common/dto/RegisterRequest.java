@@ -22,12 +22,12 @@ public class RegisterRequest {
     @NotNull(message = "角色不能为空")
     private Long roleId;
 
-    @NotBlank(message = "教师姓名不能为空")
+    @NotNull(message = "请选择是否为教师")
+    private Boolean teacher;
+
     private String teacherName;
 
-    @NotBlank(message = "联系电话不能为空")
     private String phone;
 
-    @NotBlank(message = "学工号不能为空")
     private String cardNumber;
 }

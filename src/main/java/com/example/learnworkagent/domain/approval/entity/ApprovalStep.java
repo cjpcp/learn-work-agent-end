@@ -50,6 +50,14 @@ public class ApprovalStep extends BaseEntity {
     @Column(name = "approver_user_id")
     private Long approverUserId;
 
+    @Comment("分配模式（USER-指定用户, ROLE-按角色池分配）")
+    @Column(name = "assign_mode", length = 20)
+    private String assignMode = "USER";
+
+    @Comment("目标角色ID（按角色池分配时使用）")
+    @Column(name = "role_id", length = 50)
+    private String roleId;
+
     public boolean isSingleApproval() {
         return APPROVAL_TYPE_SINGLE.equals(approvalType);
     }

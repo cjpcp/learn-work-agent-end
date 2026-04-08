@@ -25,4 +25,8 @@ public class ApprovalStepRequest {
 
     @NotNull(message = "流程ID不能为空")
     private Long processId;
+
+    private String assignMode = "USER";
+
+    private String roleId;
 }

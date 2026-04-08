@@ -129,6 +129,8 @@ public class ApprovalConfigController {
         step.setApproverRole(request.getApproverRole());
         step.setApproverUserId(request.getApproverUserId());
         step.setMustPass(request.getMustPass() != null ? request.getMustPass() : Boolean.TRUE);
+        step.setAssignMode(request.getAssignMode() != null ? request.getAssignMode() : "USER");
+        step.setRoleId(request.getRoleId());
         return step;
     }
 

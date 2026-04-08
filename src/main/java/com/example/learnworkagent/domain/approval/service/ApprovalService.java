@@ -1,5 +1,6 @@
 package com.example.learnworkagent.domain.approval.service;
 
+import com.example.learnworkagent.domain.approval.dto.ApprovalTaskDTO;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
 
@@ -41,7 +42,7 @@ public interface ApprovalService {
      * @param approverId 审批人ID
      * @return 待审批任务列表
      */
-    java.util.List<ApprovalTask> getPendingTasks(Long approverId);
+    java.util.List<ApprovalTaskDTO> getPendingTasks(Long approverId);
 
     /**
      * 获取实例当前进行中的审批任务

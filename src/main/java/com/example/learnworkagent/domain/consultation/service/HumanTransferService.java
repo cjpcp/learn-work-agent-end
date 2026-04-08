@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 
 /**
  * 人工转接服务
@@ -28,6 +29,7 @@ public class HumanTransferService {
 
     private final HumanTransferRepository humanTransferRepository;
     private final ConsultationQuestionRepository consultationQuestionRepository;
+    private final HumanTransferConfigService humanTransferConfigService;
 
     /**
      * 创建转接记录并更新问题为转接状态
@@ -37,15 +39,20 @@ public class HumanTransferService {
         ConsultationQuestion question = consultationQuestionRepository.findById(questionId)
                 .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "咨询问题不存在"));
 
-        //新建转接记录
         HumanTransfer transfer = new HumanTransfer();
         transfer.setQuestionId(questionId);
         transfer.setUserId(userId);
         transfer.setTransferType(transferType);
         transfer.setTransferReason(reason);
-        transfer.setStatus("PENDING");
 
-        // 更新问题状态
+        Long matchedStaffId = humanTransferConfigService.resolveStaffId(question.getCategory());
+        if (matchedStaffId != null) {
+            transfer.setStaffId(matchedStaffId);
+            transfer.setStatus("PROCESSING");
+        } else {
+            transfer.setStatus("PENDING");
+        }
+
         question.setTransferredToHuman(true);
         question.setStatus("TRANSFERRED");
         question.setTransferReason(reason);
@@ -54,9 +61,6 @@ public class HumanTransferService {
         humanTransferRepository.save(transfer);
     }
 
-    /**
-     * 分配工作人员
-     */
     @Transactional
     public void assignStaff(Long transferId, Long staffId) {
         HumanTransfer transfer = humanTransferRepository.findById(transferId)
@@ -67,9 +71,6 @@ public class HumanTransferService {
         humanTransferRepository.save(transfer);
     }
 
-    /**
-     * 工作人员回复
-     */
     @Transactional
     public void reply(Long transferId, Long staffId, String reply) {
         HumanTransfer transfer = humanTransferRepository.findById(transferId)
@@ -84,7 +85,6 @@ public class HumanTransferService {
         transfer.setProcessTime(LocalDateTime.now());
         humanTransferRepository.save(transfer);
 
-        // 更新问题答案
         ConsultationQuestion question = consultationQuestionRepository.findById(transfer.getQuestionId())
                 .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "咨询问题不存在"));
         question.setAiAnswer(reply);
@@ -93,22 +93,17 @@ public class HumanTransferService {
         consultationQuestionRepository.save(question);
     }
 
-    /**
-     * 直接处理转接记录（分配并回复）
-     */
     @Transactional
     public void process(Long transferId, Long staffId, String reply) {
         HumanTransfer transfer = humanTransferRepository.findById(transferId)
                 .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "转接记录不存在"));
 
-        // 分配给当前工作人员
         transfer.setStaffId(staffId);
         transfer.setStaffReply(reply);
         transfer.setStatus("COMPLETED");
         transfer.setProcessTime(LocalDateTime.now());
         humanTransferRepository.save(transfer);
 
-        // 更新问题答案
         ConsultationQuestion question = consultationQuestionRepository.findById(transfer.getQuestionId())
                 .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "咨询问题不存在"));
         question.setAiAnswer(reply);
@@ -118,7 +113,7 @@ public class HumanTransferService {
     }
 
     /**
-     * 分页查询用户的转接记录
+     * 分页查询我发起的转接记录
      */
     public PageResult<HumanTransfer> getUserTransfers(Long userId, PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
@@ -139,19 +134,19 @@ public class HumanTransferService {
     }
 
     /**
-     * 分页查询工作人员的转接记录
+     * 分页查询分配给当前工作人员的待处理记录
      */
-    public PageResult<HumanTransfer> getStaffTransfers(PageRequest pageRequest) {
+    public PageResult<HumanTransfer> getStaffTransfers(Long staffId, PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 pageRequest.getPage(),
                 pageRequest.getPageSize(),
                 Sort.by(Sort.Direction.DESC, "createTime")
         );
 
-        // 只查询未完成的记录（PENDING或PROCESSING状态）
         Page<HumanTransfer> page = humanTransferRepository
-                .findByStatusInAndDeletedFalseOrderByCreateTimeDesc(
-                        java.util.Arrays.asList("PENDING", "PROCESSING"), 
+                .findByStaffIdAndStatusInAndDeletedFalseOrderByCreateTimeDesc(
+                        staffId,
+                        Arrays.asList("PENDING", "PROCESSING"),
                         pageable
                 );
 
@@ -164,7 +159,7 @@ public class HumanTransferService {
     }
 
     /**
-     * 分页查询工作人员已完成的转接记录
+     * 分页查询当前工作人员已完成的转接记录
      */
     public PageResult<HumanTransfer> getCompletedTransfers(Long staffId, PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
@@ -173,11 +168,10 @@ public class HumanTransferService {
                 Sort.by(Sort.Direction.DESC, "processTime")
         );
 
-        // 查询已完成的记录（COMPLETED状态）
         Page<HumanTransfer> page = humanTransferRepository
                 .findByStaffIdAndStatusAndDeletedFalseOrderByCreateTimeDesc(
-                        staffId, 
-                        "COMPLETED", 
+                        staffId,
+                        "COMPLETED",
                         pageable
                 );
 

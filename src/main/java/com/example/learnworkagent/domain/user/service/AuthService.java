@@ -29,6 +29,8 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final long NO_TEACHER_ID = 0L;
+
     private final AdminRepository adminRepository;
     private final TeacherRepository teacherRepository;
     private final RoleRepository roleRepository;
@@ -44,12 +46,6 @@ public class AuthService {
             throw new BusinessException(ResultCode.UNAUTHORIZED, "账户已被禁用");
         }
 
-        Teacher teacher = teacherRepository.findById(admin.getTeacherId())
-                .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "账户关联教师不存在"));
-        if (!teacher.isEnabled()) {
-            throw new BusinessException(ResultCode.UNAUTHORIZED, "教师已被禁用");
-        }
-
         Role role = roleRepository.findById(admin.getRoleId())
                 .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "账户角色不存在"));
 
@@ -58,21 +54,15 @@ public class AuthService {
             throw new BusinessException(ResultCode.UNAUTHORIZED, "用户名或密码错误");
         }
 
+        Teacher teacher = loadTeacherIfPresent(admin.getTeacherId());
+        if (teacher != null && !teacher.isEnabled()) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED, "教师已被禁用");
+        }
+
         admin.setLoginTime(LocalDateTime.now());
         adminRepository.save(admin);
 
-        String token = jwtUtil.generateToken(admin.getId(), admin.getUsername(), role.getRoleName());
-        return new LoginResponse(
-                token,
-                admin.getId(),
-                admin.getUsername(),
-                admin.getNick(),
-                teacher.getId(),
-                teacher.getName(),
-                role.getId(),
-                role.getRoleName(),
-                admin.getStatus()
-        );
+        return buildLoginResponse(admin, role, teacher);
     }
 
     @Transactional
@@ -85,17 +75,7 @@ public class AuthService {
                 .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "角色不存在"));
 
         String decryptedPassword = rsaUtil.decrypt(request.getPassword());
-
-        Teacher teacher = new Teacher();
-        teacher.setId(null);
-        teacher.setName(request.getTeacherName());
-        teacher.setPhone(request.getPhone());
-        teacher.setCardNumber(request.getCardNumber());
-        teacher.setState(1);
-        int timestamp = (int) (System.currentTimeMillis() / 1000);
-        teacher.setCreateTime(timestamp);
-        teacher.setUpdateTime(timestamp);
-        Teacher savedTeacher = teacherRepository.save(teacher);
+        Teacher teacher = createTeacherIfRequired(request);
 
         Admin admin = new Admin();
         admin.setId(null);
@@ -104,21 +84,10 @@ public class AuthService {
         admin.setPassword(passwordEncoder.encode(decryptedPassword));
         admin.setRoleId(role.getId());
         admin.setStatus(1);
-        admin.setTeacherId(savedTeacher.getId());
+        admin.setTeacherId(teacher != null ? teacher.getId() : NO_TEACHER_ID);
         Admin savedAdmin = adminRepository.save(admin);
 
-        String token = jwtUtil.generateToken(savedAdmin.getId(), savedAdmin.getUsername(), role.getRoleName());
-        return new LoginResponse(
-                token,
-                savedAdmin.getId(),
-                savedAdmin.getUsername(),
-                savedAdmin.getNick(),
-                savedTeacher.getId(),
-                savedTeacher.getName(),
-                role.getId(),
-                role.getRoleName(),
-                savedAdmin.getStatus()
-        );
+        return buildLoginResponse(savedAdmin, role, teacher);
     }
 
     public boolean checkUsernameExists(String username) {
@@ -126,5 +95,62 @@ public class AuthService {
             return false;
         }
         return adminRepository.existsByUsername(username.trim());
+    }
+
+    private Teacher createTeacherIfRequired(RegisterRequest request) {
+        if (!Boolean.TRUE.equals(request.getTeacher())) {
+            return null;
+        }
+
+        validateTeacherFields(request);
+        Teacher teacher = new Teacher();
+        teacher.setId(null);
+        teacher.setName(request.getTeacherName().trim());
+        teacher.setPhone(request.getPhone().trim());
+        teacher.setCardNumber(request.getCardNumber().trim());
+        teacher.setState(1);
+        int timestamp = (int) (System.currentTimeMillis() / 1000);
+        teacher.setCreateTime(timestamp);
+        teacher.setUpdateTime(timestamp);
+        return teacherRepository.save(teacher);
+    }
+
+    private Teacher loadTeacherIfPresent(Long teacherId) {
+        if (teacherId == null || teacherId <= 0) {
+            return null;
+        }
+        return teacherRepository.findById(teacherId)
+                .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "账户关联教师不存在"));
+    }
+
+    private LoginResponse buildLoginResponse(Admin admin, Role role, Teacher teacher) {
+        String token = jwtUtil.generateToken(admin.getId(), admin.getUsername(), role.getRoleName());
+        return new LoginResponse(
+                token,
+                admin.getId(),
+                admin.getUsername(),
+                admin.getNick(),
+                teacher != null ? teacher.getId() : NO_TEACHER_ID,
+                teacher != null ? teacher.getName() : "",
+                role.getId(),
+                role.getRoleName(),
+                admin.getStatus()
+        );
+    }
+
+    private void validateTeacherFields(RegisterRequest request) {
+        if (isBlank(request.getTeacherName())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "教师姓名不能为空");
+        }
+        if (isBlank(request.getPhone())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "联系电话不能为空");
+        }
+        if (isBlank(request.getCardNumber())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "学工号不能为空");
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }
