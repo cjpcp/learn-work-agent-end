@@ -34,7 +34,7 @@ public class Admin {
     private String nick;
 
     @Comment("密码")
-    @Column(name = "password", nullable = false, length = 255)
+    @Column(name = "password", nullable = false)
     private String password;
 
     @Comment("角色id")

@@ -93,6 +93,19 @@ public class LeaveController extends BaseController {
     }
 
     /**
+     * 分页查询待审批销假申请。
+     *
+     * @param pageRequest 分页参数
+     * @return 分页结果
+     */
+    @Operation(summary = "分页查询待审批销假申请")
+    @GetMapping("/applications/pending-cancel")
+    public Result<PageResult<LeaveApplication>> getPendingCancelRequests(@Valid PageRequest pageRequest) {
+        PageResult<LeaveApplication> result = leaveApplicationService.getPendingCancelRequests(getRequiredCurrentUserId(), pageRequest);
+        return Result.success(result);
+    }
+
+    /**
      * 审批请假申请。
      *
      * @param id 请假申请ID
@@ -120,15 +133,29 @@ public class LeaveController extends BaseController {
     }
 
     /**
-     * 销假。
+     * 申请销假。
      *
      * @param id 请假申请ID
      * @return 响应结果
      */
-    @Operation(summary = "销假")
+    @Operation(summary = "申请销假")
     @PostMapping("/applications/{id}/cancel")
-    public Result<Void> cancelLeave(@PathVariable Long id) {
-        leaveApplicationService.cancelLeave(id);
+    public Result<Void> requestCancelLeave(@PathVariable Long id) {
+        leaveApplicationService.requestCancelLeave(id);
+        return Result.success();
+    }
+
+    /**
+     * 审批销假申请。
+     *
+     * @param id 请假申请ID
+     * @param request 审批参数
+     * @return 响应结果
+     */
+    @Operation(summary = "审批销假申请")
+    @PostMapping("/applications/{id}/approve-cancel")
+    public Result<Void> approveCancelRequest(@PathVariable Long id, @Valid @RequestBody ApprovalRequest request) {
+        leaveApplicationService.approveCancelRequest(id, "APPROVED".equals(request.getApprovalStatus()), request.getApprovalComment());
         return Result.success();
     }
 

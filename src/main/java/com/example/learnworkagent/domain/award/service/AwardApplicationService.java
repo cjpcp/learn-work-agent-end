@@ -164,15 +164,11 @@ public class AwardApplicationService {
         application.setAwardName(request.getAwardName());
         application.setAmount(request.getAmount());
         application.setReason(request.getReason());
-        application.setAttachmentUrls(buildAttachmentUrls(request));
+        application.setAttachmentUrls(request.getAttachmentUrls());
         application.setMaterialStatus(MATERIAL_STATUS_PENDING);
         application.setApprovalStatus(ApprovalStatusEnum.PENDING.getCode());
         application.setStudentName(request.getStudentName());
         return application;
-    }
-
-    private String buildAttachmentUrls(AwardApplicationRequest request) {
-        return request.getAttachmentUrls() == null ? null : String.join(",", request.getAttachmentUrls());
     }
 
     private void createApprovalFlow(AwardApplication application, Long applicantId, AwardApplicationRequest request) {

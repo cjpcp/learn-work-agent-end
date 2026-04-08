@@ -4,7 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 @Data
 public class AwardApplicationRequest {
@@ -19,7 +18,7 @@ public class AwardApplicationRequest {
 
     private String reason;
 
-    private List<String> attachmentUrls;
+    private String attachmentUrls;
 
     private String studentName;
 }

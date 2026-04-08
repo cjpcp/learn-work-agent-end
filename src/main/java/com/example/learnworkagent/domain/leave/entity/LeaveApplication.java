@@ -98,15 +98,35 @@ public class LeaveApplication extends BaseEntity {
     @Column(name = "cancel_time")
     private LocalDateTime cancelTime;
 
+    /** 是否已申请销假。 */
+    @Comment("是否已申请销假")
+    @Column(name = "cancel_requested", nullable = false)
+    private Boolean cancelRequested = false;
+
+    /** 销假审批状态。 */
+    @Comment("销假审批状态")
+    @Column(name = "cancel_approval_status", length = 20)
+    private String cancelApprovalStatus;
+
+    /** 销假审批意见。 */
+    @Comment("销假审批意见")
+    @Column(name = "cancel_approval_comment", length = 500)
+    private String cancelApprovalComment;
+
+    /** 销假审批时间。 */
+    @Comment("销假审批时间")
+    @Column(name = "cancel_approval_time")
+    private LocalDateTime cancelApprovalTime;
+
     /** 学生姓名。 */
     @Comment("姓名")
     @Column(name = "student_name", length = 50)
     private String studentName;
 
-    /** 院系ID。 */
-    @Comment("院系ID")
-    @Column(name = "department_id")
-    private Long departmentId;
+    /** 院系名称。 */
+    @Comment("院系名称")
+    @Column(name = "department_id", length = 50)
+    private String departmentName;
 
     /** 年级。 */
     @Comment("年级")

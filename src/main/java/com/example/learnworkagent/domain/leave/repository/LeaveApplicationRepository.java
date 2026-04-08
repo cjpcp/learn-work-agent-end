@@ -50,4 +50,14 @@ public interface LeaveApplicationRepository extends JpaRepository<LeaveApplicati
                                                                                                    String approvalStatus,
                                                                                                    Pageable pageable);
 
+    /**
+     * 查询待审批销假申请（由指定审批人审批）。
+     *
+     * @param approverId 审批人ID（原请假审批人）
+     * @param pageable 分页参数
+     * @return 分页结果
+     */
+    @Query("SELECT la FROM LeaveApplication la WHERE la.approverId = :approverId AND la.cancelRequested = true AND la.cancelApprovalStatus = 'PENDING' AND la.deleted = false")
+    Page<LeaveApplication> findPendingCancelRequestsByApproverId(@Param("approverId") Long approverId, Pageable pageable);
+
 }

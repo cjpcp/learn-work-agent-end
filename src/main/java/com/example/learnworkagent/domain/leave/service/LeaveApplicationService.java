@@ -18,6 +18,7 @@ import com.example.learnworkagent.infrastructure.external.template.TemplateServi
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import java.time.LocalDateTime;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -117,10 +118,6 @@ public class LeaveApplicationService {
      */
     @Transactional
     public void generateLeaveSlip(LeaveApplication application) {
-        if (!application.isApproved()) {
-            throw new BusinessException(ResultCode.PARAM_ERROR, "只有已批准的申请才能生成请假条");
-        }
-
         try {
             byte[] docBytes = templateService.generateLeaveSlip(application);
             MultipartFile docxFile = buildLeaveSlipFile(application, docBytes);
@@ -135,22 +132,53 @@ public class LeaveApplicationService {
     }
 
     /**
-     * 销假。
+     * 申请销假。
      *
      * @param applicationId 请假申请ID
      */
     @Transactional
-    public void cancelLeave(Long applicationId) {
+    public void requestCancelLeave(Long applicationId) {
         LeaveApplication application = getApplicationById(applicationId);
 
         if (!application.isApproved()) {
-            throw new BusinessException(ResultCode.PARAM_ERROR, "只有已批准的申请才能销假");
+            throw new BusinessException(ResultCode.PARAM_ERROR, "只有已批准的申请才能申请销假");
         }
         if (Boolean.TRUE.equals(application.getCancelled())) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "该申请已销假");
         }
+        if (Boolean.TRUE.equals(application.getCancelRequested())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "该申请已提交销假申请");
+        }
 
-        application.markCancelled();
+        application.setCancelRequested(true);
+        application.setCancelApprovalStatus(ApprovalStatusEnum.PENDING.getCode());
+        leaveApplicationRepository.save(application);
+    }
+
+    /**
+     * 审批销假申请。
+     *
+     * @param applicationId 请假申请ID
+     * @param approved 是否批准
+     * @param comment 审批意见
+     */
+    @Transactional
+    public void approveCancelRequest(Long applicationId, boolean approved, String comment) {
+        LeaveApplication application = getApplicationById(applicationId);
+
+        if (!Boolean.TRUE.equals(application.getCancelRequested())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "该申请未提交销假申请");
+        }
+        if (!ApprovalStatusEnum.PENDING.getCode().equals(application.getCancelApprovalStatus())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "销假申请已审批");
+        }
+
+        if (approved) {
+            application.markCancelled();
+        }
+        application.setCancelApprovalStatus(approved ? ApprovalStatusEnum.APPROVED.getCode() : ApprovalStatusEnum.REJECTED.getCode());
+        application.setCancelApprovalComment(comment);
+        application.setCancelApprovalTime(LocalDateTime.now());
         leaveApplicationRepository.save(application);
     }
 
@@ -204,6 +232,19 @@ public class LeaveApplicationService {
         return buildPageResult(page, pageRequest);
     }
 
+    /**
+     * 分页查询待审批销假申请。
+     *
+     * @param approverId 审批人ID（原请假审批人）
+     * @param pageRequest 分页参数
+     * @return 分页结果
+     */
+    public PageResult<LeaveApplication> getPendingCancelRequests(Long approverId, PageRequest pageRequest) {
+        Pageable pageable = buildPageable(pageRequest);
+        Page<LeaveApplication> page = leaveApplicationRepository.findPendingCancelRequestsByApproverId(approverId, pageable);
+        return buildPageResult(page, pageRequest);
+    }
+
     private void validateLeaveDates(LeaveApplicationRequest request) {
         if (request.getStartDate().isAfter(request.getEndDate())) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "开始日期不能晚于结束日期");
@@ -228,6 +269,9 @@ public class LeaveApplicationService {
         application.setReason(request.getReason());
         application.setAttachmentUrl(request.getAttachmentUrl());
         application.setStudentName(request.getStudentName());
+        application.setDepartmentName(request.getDepartmentName());
+        application.setGrade(request.getGrade());
+        application.setClassName(request.getClassName());
         application.setApprovalStatus(ApprovalStatusEnum.PENDING.getCode());
         application.setLeaveSlipStatus(LeaveSlipStatusEnum.NOT_GENERATED.getCode());
         return application;
@@ -243,8 +287,11 @@ public class LeaveApplicationService {
     }
 
     private Map<String, Object> buildApplicantInfo(LeaveApplicationRequest request) {
-        Map<String, Object> applicantInfo = new HashMap<>(1);
+        Map<String, Object> applicantInfo = new HashMap<>(4);
         applicantInfo.put("studentName", request.getStudentName());
+        applicantInfo.put("departmentName", request.getDepartmentName());
+        applicantInfo.put("grade", request.getGrade());
+        applicantInfo.put("className", request.getClassName());
         return applicantInfo;
     }
 
