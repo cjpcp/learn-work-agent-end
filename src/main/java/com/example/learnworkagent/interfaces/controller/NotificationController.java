@@ -13,7 +13,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -44,7 +43,6 @@ public class NotificationController {
     }
 
     @PostMapping("/{id}/read")
-    @PutMapping("/{id}/read")
     @Operation(summary = "标记已读", description = "将指定通知标记为已读")
     public Result<Void> markAsRead(@AuthenticationPrincipal Admin admin, @PathVariable Long id) {
         notificationService.markAsRead(id, admin.getId());

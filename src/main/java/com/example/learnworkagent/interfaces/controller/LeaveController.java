@@ -80,19 +80,6 @@ public class LeaveController extends BaseController {
     }
 
     /**
-     * 分页查询待审批的请假申请。
-     *
-     * @param pageRequest 分页参数
-     * @return 分页结果
-     */
-    @Operation(summary = "分页查询待审批的请假申请（审批人）")
-    @GetMapping("/applications/pending")
-    public Result<PageResult<LeaveApplication>> getPendingApplications(@Valid PageRequest pageRequest) {
-        PageResult<LeaveApplication> result = leaveApplicationService.getPendingApplications(getRequiredCurrentUserId(), pageRequest);
-        return Result.success(result);
-    }
-
-    /**
      * 分页查询待审批销假申请。
      *
      * @param pageRequest 分页参数

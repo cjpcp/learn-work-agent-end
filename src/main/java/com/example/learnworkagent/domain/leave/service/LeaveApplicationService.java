@@ -6,7 +6,6 @@ import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
 import com.example.learnworkagent.common.enums.LeaveSlipStatusEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
-import com.example.learnworkagent.domain.approval.dto.ApprovalTaskDTO;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
 import com.example.learnworkagent.domain.approval.service.ApprovalService;
@@ -18,11 +17,13 @@ import com.example.learnworkagent.infrastructure.external.template.TemplateServi
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import java.time.LocalDateTime;
+
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,7 +36,6 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -64,7 +64,7 @@ public class LeaveApplicationService {
      * 提交请假申请。
      *
      * @param applicantId 申请人ID
-     * @param request 请假申请参数
+     * @param request     请假申请参数
      * @return 保存后的请假申请
      */
     @Transactional
@@ -81,9 +81,9 @@ public class LeaveApplicationService {
     /**
      * 审批请假申请。
      *
-     * @param applicationId 请假申请ID
-     * @param approverId 审批人ID
-     * @param approvalStatus 审批状态
+     * @param applicationId   请假申请ID
+     * @param approverId      审批人ID
+     * @param approvalStatus  审批状态
      * @param approvalComment 审批意见
      */
     @Transactional
@@ -159,8 +159,8 @@ public class LeaveApplicationService {
      * 审批销假申请。
      *
      * @param applicationId 请假申请ID
-     * @param approved 是否批准
-     * @param comment 审批意见
+     * @param approved      是否批准
+     * @param comment       审批意见
      */
     @Transactional
     public void approveCancelRequest(Long applicationId, boolean approved, String comment) {
@@ -196,7 +196,7 @@ public class LeaveApplicationService {
     /**
      * 分页查询用户的请假申请。
      *
-     * @param userId 用户ID
+     * @param userId      用户ID
      * @param pageRequest 分页参数
      * @return 分页结果
      */
@@ -207,35 +207,11 @@ public class LeaveApplicationService {
         return buildPageResult(page, pageRequest);
     }
 
-    /**
-     * 分页查询待审批的请假申请。
-     *
-     * @param approverId 审批人ID
-     * @param pageRequest 分页参数
-     * @return 分页结果
-     */
-    public PageResult<LeaveApplication> getPendingApplications(Long approverId, PageRequest pageRequest) {
-        Pageable pageable = buildPageable(pageRequest);
-        List<Long> applicationIds = approvalService.getPendingTasks(approverId).stream()
-                .map(ApprovalTaskDTO::getBusinessId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .collect(java.util.stream.Collectors.toList());
-
-        Page<LeaveApplication> page;
-        if (applicationIds.isEmpty()) {
-            page = Page.empty(pageable);
-        } else {
-            page = leaveApplicationRepository.findAll(buildPendingApplicationsSpecification(applicationIds), pageable);
-        }
-
-        return buildPageResult(page, pageRequest);
-    }
 
     /**
      * 分页查询待审批销假申请。
      *
-     * @param approverId 审批人ID（原请假审批人）
+     * @param approverId  审批人ID（原请假审批人）
      * @param pageRequest 分页参数
      * @return 分页结果
      */
@@ -311,7 +287,7 @@ public class LeaveApplicationService {
         final String fileName = LEAVE_SLIP_FILE_PREFIX + application.getId() + LEAVE_SLIP_FILE_SUFFIX;
         return new MultipartFile() {
             @Override
-            public String getName() {
+            public @NotNull String getName() {
                 return fileName;
             }
 
@@ -336,17 +312,17 @@ public class LeaveApplicationService {
             }
 
             @Override
-            public byte[] getBytes() {
+            public byte @NotNull [] getBytes() {
                 return docBytes;
             }
 
             @Override
-            public InputStream getInputStream() {
+            public @NotNull InputStream getInputStream() {
                 return new ByteArrayInputStream(docBytes);
             }
 
             @Override
-            public void transferTo(File dest) throws IOException {
+            public void transferTo(@NotNull File dest) throws IOException {
                 Files.write(dest.toPath(), docBytes);
             }
         };
@@ -369,7 +345,5 @@ public class LeaveApplicationService {
         );
     }
 
-    private Specification<LeaveApplication> buildPendingApplicationsSpecification(List<Long> applicationIds) {
-        return (root, query, criteriaBuilder) -> root.get("id").in(applicationIds);
-    }
+
 }

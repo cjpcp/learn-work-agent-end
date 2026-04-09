@@ -4,7 +4,6 @@ import com.example.learnworkagent.common.Result;
 import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.domain.process.dto.ProcessItem;
-import com.example.learnworkagent.domain.process.dto.ProcessListResponse;
 import com.example.learnworkagent.domain.process.service.ProcessService;
 import com.example.learnworkagent.domain.user.entity.Admin;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/process")
@@ -64,15 +62,6 @@ public class ProcessController extends BaseController {
         return Result.success(processService.getCompletedLeaveCancel(admin, pageRequest));
     }
 
-    @GetMapping("/list")
-    public Result<ProcessListResponse> getProcessList(@AuthenticationPrincipal Admin admin) {
-        return Result.success(processService.getProcessList(admin));
-    }
-
-    @GetMapping("/completed")
-    public Result<List<ProcessItem>> getCompletedProcesses(@AuthenticationPrincipal Admin admin) {
-        return Result.success(processService.getCompletedProcesses(admin));
-    }
 
     @GetMapping("/{id}")
     public Result<ProcessItem> getProcessDetail(@PathVariable String id, @RequestParam String type) {

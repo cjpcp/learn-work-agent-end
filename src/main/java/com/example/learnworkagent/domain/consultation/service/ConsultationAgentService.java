@@ -315,13 +315,12 @@ public class ConsultationAgentService {
                     log.info("调用Dify AI，问题ID: {}, 文件数: {}", questionId,
                             fileUrls != null ? fileUrls.size() : 0);
 
-                    ConsultationQuestion questionForCapture = question;
                     return difyChatService.chatStream(prompt, fileUrls, null,
                                     String.valueOf(question.getUserId()),
                                     convId -> {
                                         log.info("流式处理捕获到conversation_id: {}，保存到问题: {}", convId, questionId);
-                                        questionForCapture.setConversationId(convId);
-                                        consultationQuestionRepository.save(questionForCapture);
+                                        question.setConversationId(convId);
+                                        consultationQuestionRepository.save(question);
                                     })
                             //所有数据发送完成时的回调函数
                             .doOnComplete(() -> {

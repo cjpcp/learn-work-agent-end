@@ -205,7 +205,7 @@ public class HumanTransferConfigService {
         }
         List<Long> result = new ArrayList<>();
         for (String item : userIds.split(",")) {
-            if (item != null && !item.trim().isEmpty()) {
+            if (!item.trim().isEmpty()) {
                 result.add(Long.parseLong(item.trim()));
             }
         }
@@ -226,29 +226,5 @@ public class HumanTransferConfigService {
             throw new BusinessException(ResultCode.PARAM_ERROR, "分配模式仅支持 USER 或 ROLE");
         }
         return value;
-    }
-
-    public boolean isConfiguredHandler(Admin admin) {
-        if (admin == null || admin.getId() == null) {
-            return false;
-        }
-        List<HumanTransferConfig> userConfigs = configRepository
-                .findByAssignModeAndEnabledTrueAndDeletedFalse(ASSIGN_MODE_USER);
-        for (HumanTransferConfig config : userConfigs) {
-            List<Long> userIds = parseUserIds(config.getUserIds());
-            if (userIds.contains(admin.getId())) {
-                return true;
-            }
-        }
-        if (admin.getRoleId() != null) {
-            List<HumanTransferConfig> roleConfigs = configRepository
-                    .findByAssignModeAndEnabledTrueAndDeletedFalse(ASSIGN_MODE_ROLE);
-            for (HumanTransferConfig config : roleConfigs) {
-                if (admin.getRoleId().equals(config.getRoleId())) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 }

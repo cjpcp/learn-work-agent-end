@@ -26,21 +26,6 @@ public class UserServiceImpl implements UserService {
     private final AdminRepository adminRepository;
 
     @Override
-    public List<Admin> findAll() {
-        return adminRepository.findAll();
-    }
-
-    @Override
-    public List<Admin> findByRoleId(Long roleId) {
-        return adminRepository.findByRoleId(roleId);
-    }
-
-    @Override
-    public List<Admin> findUsers(Long roleId, String username, String nick, Integer status) {
-        return adminRepository.findAll(buildSpecification(roleId, username, nick, status));
-    }
-
-    @Override
     public PageResult<Admin> findUsersPage(Long roleId, String username, String nick, Integer status, PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 pageRequest.getPage(),

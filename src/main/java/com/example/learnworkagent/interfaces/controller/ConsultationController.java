@@ -86,22 +86,6 @@ public class ConsultationController extends BaseController {
         return Result.success(result);
     }
 
-    @Operation(summary = "分页查询所有问题（管理员）")
-    @GetMapping("/questions")
-    public Result<PageResult<ConsultationQuestion>> getAllQuestions(
-            @Valid PageRequest pageRequest,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String category) {
-        PageResult<ConsultationQuestion> result = consultationService.getAllQuestions(pageRequest, status, category);
-        return Result.success(result);
-    }
-
-    @Operation(summary = "评价问题回答")
-    @PostMapping("/questions/{id}/rate")
-    public Result<Void> rateQuestion(@PathVariable Long id, @RequestParam Integer satisfactionScore) {
-        consultationService.rateQuestion(id, satisfactionScore);
-        return Result.success();
-    }
 
     @Operation(summary = "申请转人工")
     @PostMapping("/questions/{id}/transfer")

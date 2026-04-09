@@ -19,6 +19,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
+
 import java.util.List;
 import java.util.Map;
 
@@ -80,33 +81,6 @@ public class ConsultationService {
 
         Page<ConsultationQuestion> page = consultationQuestionRepository
                 .findByUserIdAndDeletedFalseOrderByCreateTimeDesc(userId, pageable);
-
-        return new PageResult<>(
-                page.getContent(),
-                page.getTotalElements(),
-                pageRequest.getPageNum(),
-                pageRequest.getPageSize()
-        );
-    }
-
-    /**
-     * 分页查询所有问题（管理员）
-     */
-    public PageResult<ConsultationQuestion> getAllQuestions(PageRequest pageRequest, String status, String category) {
-        Pageable pageable = org.springframework.data.domain.PageRequest.of(
-                pageRequest.getPage(),
-                pageRequest.getPageSize(),
-                Sort.by(Sort.Direction.DESC, "createTime")
-        );
-
-        Page<ConsultationQuestion> page;
-        if (status != null && !status.isEmpty()) {
-            page = consultationQuestionRepository.findByStatusAndDeletedFalseOrderByCreateTimeDesc(status, pageable);
-        } else if (category != null && !category.isEmpty()) {
-            page = consultationQuestionRepository.findByCategoryAndDeletedFalseOrderByCreateTimeDesc(category, pageable);
-        } else {
-            page = consultationQuestionRepository.findAll(pageable);
-        }
 
         return new PageResult<>(
                 page.getContent(),
