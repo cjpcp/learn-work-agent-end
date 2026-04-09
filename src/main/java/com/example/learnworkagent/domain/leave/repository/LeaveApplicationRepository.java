@@ -60,4 +60,19 @@ public interface LeaveApplicationRepository extends JpaRepository<LeaveApplicati
     @Query("SELECT la FROM LeaveApplication la WHERE la.approverId = :approverId AND la.cancelRequested = true AND la.cancelApprovalStatus = 'PENDING' AND la.deleted = false")
     Page<LeaveApplication> findPendingCancelRequestsByApproverId(@Param("approverId") Long approverId, Pageable pageable);
 
+    @Query("SELECT la FROM LeaveApplication la WHERE la.applicantId = :applicantId AND la.cancelRequested = true AND la.cancelApprovalStatus = 'PENDING' AND la.deleted = false")
+    Page<LeaveApplication> findPendingCancelRequestsByApplicantId(@Param("applicantId") Long applicantId, Pageable pageable);
+
+    @Query("SELECT la FROM LeaveApplication la WHERE la.applicantId = :applicantId AND la.cancelRequested = true AND la.cancelApprovalStatus IN :statuses AND la.deleted = false ORDER BY la.cancelTime DESC")
+    Page<LeaveApplication> findByApplicantIdAndCancelRequestedTrueAndCancelApprovalStatusInAndDeletedFalseOrderByCancelTimeDesc(
+            @Param("applicantId") Long applicantId,
+            @Param("statuses") List<String> statuses,
+            Pageable pageable);
+
+    @Query("SELECT la FROM LeaveApplication la WHERE la.approverId = :approverId AND la.cancelRequested = true AND la.cancelApprovalStatus IN :statuses AND la.deleted = false ORDER BY la.cancelTime DESC")
+    Page<LeaveApplication> findByApproverIdAndCancelRequestedTrueAndCancelApprovalStatusInAndDeletedFalseOrderByCancelTimeDesc(
+            @Param("approverId") Long approverId,
+            @Param("statuses") List<String> statuses,
+            Pageable pageable);
+
 }

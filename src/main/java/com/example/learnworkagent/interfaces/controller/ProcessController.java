@@ -1,6 +1,8 @@
 package com.example.learnworkagent.interfaces.controller;
 
 import com.example.learnworkagent.common.Result;
+import com.example.learnworkagent.common.dto.PageRequest;
+import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.domain.process.dto.ProcessItem;
 import com.example.learnworkagent.domain.process.dto.ProcessListResponse;
 import com.example.learnworkagent.domain.process.service.ProcessService;
@@ -21,6 +23,46 @@ import java.util.List;
 public class ProcessController extends BaseController {
 
     private final ProcessService processService;
+
+    @GetMapping("/pending/all")
+    public Result<PageResult<ProcessItem>> getPendingAll(@AuthenticationPrincipal Admin admin, PageRequest pageRequest) {
+        return Result.success(processService.getPendingAll(admin, pageRequest));
+    }
+
+    @GetMapping("/pending/award")
+    public Result<PageResult<ProcessItem>> getPendingAward(@AuthenticationPrincipal Admin admin, PageRequest pageRequest) {
+        return Result.success(processService.getPendingAward(admin, pageRequest));
+    }
+
+    @GetMapping("/pending/leave")
+    public Result<PageResult<ProcessItem>> getPendingLeave(@AuthenticationPrincipal Admin admin, PageRequest pageRequest) {
+        return Result.success(processService.getPendingLeave(admin, pageRequest));
+    }
+
+    @GetMapping("/pending/leave-cancel")
+    public Result<PageResult<ProcessItem>> getPendingLeaveCancel(@AuthenticationPrincipal Admin admin, PageRequest pageRequest) {
+        return Result.success(processService.getPendingLeaveCancel(admin, pageRequest));
+    }
+
+    @GetMapping("/completed/all")
+    public Result<PageResult<ProcessItem>> getCompletedAll(@AuthenticationPrincipal Admin admin, PageRequest pageRequest) {
+        return Result.success(processService.getCompletedAll(admin, pageRequest));
+    }
+
+    @GetMapping("/completed/award")
+    public Result<PageResult<ProcessItem>> getCompletedAward(@AuthenticationPrincipal Admin admin, PageRequest pageRequest) {
+        return Result.success(processService.getCompletedAward(admin, pageRequest));
+    }
+
+    @GetMapping("/completed/leave")
+    public Result<PageResult<ProcessItem>> getCompletedLeave(@AuthenticationPrincipal Admin admin, PageRequest pageRequest) {
+        return Result.success(processService.getCompletedLeave(admin, pageRequest));
+    }
+
+    @GetMapping("/completed/leave-cancel")
+    public Result<PageResult<ProcessItem>> getCompletedLeaveCancel(@AuthenticationPrincipal Admin admin, PageRequest pageRequest) {
+        return Result.success(processService.getCompletedLeaveCancel(admin, pageRequest));
+    }
 
     @GetMapping("/list")
     public Result<ProcessListResponse> getProcessList(@AuthenticationPrincipal Admin admin) {
