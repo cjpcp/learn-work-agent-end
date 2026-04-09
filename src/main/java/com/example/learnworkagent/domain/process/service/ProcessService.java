@@ -73,6 +73,9 @@ public class ProcessService {
         if (PROCESS_TYPE_AWARD.equals(type)) {
             return buildAwardProcessDetail(id);
         }
+        if (PROCESS_TYPE_LEAVE_CANCEL.equals(type)) {
+            return buildLeaveCancelProcessDetail(id);
+        }
         throw new BusinessException(ResultCode.PARAM_ERROR, "未知的流程类型: " + type);
     }
 
@@ -464,6 +467,30 @@ public class ProcessService {
                 application.getId(), "奖助学金审批", PROCESS_TYPE_AWARD,
                 application.getCreateTime().format(DATE_TIME_FORMATTER),
                 application.getApprovalStatus(), "用户的奖助学金申请"
+        );
+    }
+
+    private ProcessItem buildLeaveCancelProcessDetail(String id) {
+        LeaveApplication application = leaveApplicationRepository.findById(Long.parseLong(id)).orElse(null);
+        if (application == null) {
+            return new ProcessItem();
+        }
+        String status = PROCESS_STATUS_PENDING;
+        String description = "销假申请等待审批";
+        if (application.getCancelApprovalStatus() != null) {
+            if (ApprovalStatusEnum.APPROVED.getCode().equals(application.getCancelApprovalStatus())) {
+                status = PROCESS_STATUS_COMPLETED;
+                description = "销假申请已批准";
+            } else if (ApprovalStatusEnum.REJECTED.getCode().equals(application.getCancelApprovalStatus())) {
+                status = PROCESS_STATUS_COMPLETED;
+                description = "销假申请已拒绝";
+            }
+        }
+        return buildProcessItem(
+                application.getId(), LEAVE_CANCEL_APPLICATION_NAME, PROCESS_TYPE_LEAVE_CANCEL,
+                application.getCancelTime() != null ? application.getCancelTime().format(DATE_TIME_FORMATTER) : application.getCreateTime().format(DATE_TIME_FORMATTER),
+                status,
+                description
         );
     }
 
