@@ -85,10 +85,4 @@ public class NotificationMessage implements Serializable {
 
     /** 请假原因。 */
     private String leaveReason;
-
-    /** 用户微信 OpenID。 */
-    private String wechatOpenId;
-
-    /** 用户企业微信账号 UserId。 */
-    private String weworkUserId;
 }

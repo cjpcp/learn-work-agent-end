@@ -401,8 +401,6 @@ public class ApprovalServiceImpl implements ApprovalService {
                 .userId(receiver.getId())
                 .phone(teacher != null ? teacher.getPhone() : null)
                 .email(null)
-                .wechatOpenId(null)
-                .weworkUserId(null)
                 .type(type)
                 .title(title)
                 .content(content)
