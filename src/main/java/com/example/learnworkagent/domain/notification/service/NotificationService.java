@@ -6,7 +6,10 @@ import com.example.learnworkagent.domain.notification.entity.Notification;
 import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
 
 /**
- * 通知服务接口
+ * 通知服务接口.
+ * <p>定义通知的发送、查询、状态管理等业务逻辑.</p>
+ *
+ * @author system
  */
 public interface NotificationService {
 

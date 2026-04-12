@@ -15,7 +15,10 @@ import org.hibernate.annotations.Comment;
 import java.time.LocalDateTime;
 
 /**
- * 站内信通知实体。
+ * 站内信通知实体.
+ * <p>对应数据库中的notification表，存储系统发送给用户的通知消息.</p>
+ *
+ * @author system
  */
 @Data
 @Builder

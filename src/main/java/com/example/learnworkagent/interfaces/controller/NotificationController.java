@@ -19,6 +19,13 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 通知控制器.
+ * <p>提供通知的查询和状态管理接口.</p>
+ *
+ * @author system
+ * @see NotificationService
+ */
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
@@ -27,14 +34,27 @@ public class NotificationController {
 
     private final NotificationService notificationService;
 
-    @GetMapping
+    /**
+     * 分页获取当前用户的通知列表.
+     *
+     * @param admin       当前登录用户
+     * @param pageRequest 分页参数
+     * @return 分页后的通知列表
+     */
     @Operation(summary = "获取通知列表", description = "分页获取当前用户的通知列表")
+    @GetMapping
     public Result<PageResult<Notification>> getNotifications(@AuthenticationPrincipal Admin admin, PageRequest pageRequest) {
         return Result.success(notificationService.getUserNotifications(admin.getId(), pageRequest));
     }
 
-    @GetMapping("/unread-count")
+    /**
+     * 获取当前用户的未读通知数量.
+     *
+     * @param admin 当前登录用户
+     * @return 未读通知数量
+     */
     @Operation(summary = "获取未读数量", description = "获取当前用户的未读通知数量")
+    @GetMapping("/unread-count")
     public Result<Map<String, Long>> getUnreadCount(@AuthenticationPrincipal Admin admin) {
         long count = notificationService.getUnreadCount(admin.getId());
         Map<String, Long> result = new HashMap<>();
@@ -42,8 +62,15 @@ public class NotificationController {
         return Result.success(result);
     }
 
-    @PostMapping("/{id}/read")
+    /**
+     * 将指定通知标记为已读.
+     *
+     * @param admin 当前登录用户
+     * @param id    通知ID
+     * @return 操作结果
+     */
     @Operation(summary = "标记已读", description = "将指定通知标记为已读")
+    @PostMapping("/{id}/read")
     public Result<Void> markAsRead(@AuthenticationPrincipal Admin admin, @PathVariable Long id) {
         notificationService.markAsRead(id, admin.getId());
         return Result.success();

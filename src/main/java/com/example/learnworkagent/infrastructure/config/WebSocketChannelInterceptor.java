@@ -14,8 +14,10 @@ import java.security.Principal;
 import java.util.Objects;
 
 /**
- * WebSocket Channel拦截器
- * 用于在STOMP消息处理时设置用户身份
+ * WebSocket消息频道拦截器.
+ * <p>在STOMP消息处理时设置用户身份信息.</p>
+ *
+ * @author system
  */
 @Slf4j
 @Component

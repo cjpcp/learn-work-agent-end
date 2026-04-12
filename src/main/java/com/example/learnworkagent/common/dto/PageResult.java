@@ -7,7 +7,10 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * 分页结果DTO
+ * 分页结果DTO.
+ * <p>封装分页查询的数据列表和分页信息.</p>
+ *
+ * @author system
  */
 @Data
 @NoArgsConstructor

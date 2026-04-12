@@ -3,7 +3,10 @@ package com.example.learnworkagent.domain.consultation.dto;
 import lombok.Data;
 
 /**
- * 转人工请求DTO
+ * 转人工请求DTO.
+ * <p>封装用户申请转人工服务的请求参数.</p>
+ *
+ * @author system
  */
 @Data
 public class TransferToHumanRequest {

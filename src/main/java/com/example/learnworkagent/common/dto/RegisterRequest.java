@@ -5,7 +5,10 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
- * 注册请求DTO
+ * 注册请求DTO.
+ * <p>包含用户注册所需的用户名、密码、昵称和角色信息.</p>
+ *
+ * @author system
  */
 @Data
 public class RegisterRequest {

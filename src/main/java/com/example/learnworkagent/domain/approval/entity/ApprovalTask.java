@@ -10,7 +10,10 @@ import org.hibernate.annotations.Comment;
 import java.time.LocalDateTime;
 
 /**
- * 审批任务
+ * 审批任务实体.
+ * <p>对应数据库中的approval_task表，记录每个审批节点的任务信息.</p>
+ *
+ * @author system
  */
 @Data
 @EqualsAndHashCode(callSuper = true)

@@ -4,6 +4,12 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 审批任务DTO.
+ * <p>封装审批任务的展示信息.</p>
+ *
+ * @author system
+ */
 @Data
 public class ApprovalTaskDTO {
     private Long id;

@@ -13,7 +13,10 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * 请假申请仓库。
+ * 请假申请仓储层.
+ * <p>提供对leave_application表的数据访问操作.</p>
+ *
+ * @author system
  */
 @Repository
 public interface LeaveApplicationRepository extends JpaRepository<LeaveApplication, Long>, JpaSpecificationExecutor<LeaveApplication> {

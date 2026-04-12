@@ -14,8 +14,10 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 import java.util.Map;
 
 /**
- * WebSocket握手拦截器
- * 用于在WebSocket连接时进行JWT认证
+ * WebSocket握手认证拦截器.
+ * <p>在WebSocket连接建立时进行JWT认证校验.</p>
+ *
+ * @author system
  */
 @Slf4j
 @Component

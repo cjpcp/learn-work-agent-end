@@ -9,8 +9,10 @@ import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 /**
- * WebSocket配置类
- * 用于实现站内信的实时推送
+ * WebSocket配置类.
+ * <p>配置WebSocket消息代理、频道拦截器，实现站内信的实时推送功能.</p>
+ *
+ * @author system
  */
 @Configuration
 @EnableWebSocketMessageBroker

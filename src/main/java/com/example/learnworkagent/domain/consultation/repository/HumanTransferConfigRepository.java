@@ -7,6 +7,12 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 人工转接配置仓储层.
+ * <p>提供对human_transfer_config表的数据访问操作.</p>
+ *
+ * @author system
+ */
 @Repository
 public interface HumanTransferConfigRepository extends JpaRepository<HumanTransferConfig, Long> {
 

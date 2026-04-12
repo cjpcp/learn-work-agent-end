@@ -5,7 +5,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 登录响应DTO
+ * 登录响应DTO.
+ * <p>包含登录成功后的Token和用户基本信息.</p>
+ *
+ * @author system
  */
 @Data
 @NoArgsConstructor

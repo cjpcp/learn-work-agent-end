@@ -7,7 +7,10 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
- * 咨询问题实体
+ * 咨询问题实体.
+ * <p>对应数据库中的consultation_question表，存储用户的咨询问题及AI回答.</p>
+ *
+ * @author system
  */
 @Data
 @EqualsAndHashCode(callSuper = true)

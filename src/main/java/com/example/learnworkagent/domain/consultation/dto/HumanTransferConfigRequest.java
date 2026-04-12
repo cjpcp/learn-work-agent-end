@@ -7,7 +7,10 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 人工转接配置请求
+ * 人工转接配置请求DTO.
+ * <p>封装人工转接规则的创建/更新请求参数.</p>
+ *
+ * @author system
  */
 @Data
 public class HumanTransferConfigRequest {

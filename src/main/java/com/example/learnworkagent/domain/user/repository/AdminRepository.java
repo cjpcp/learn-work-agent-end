@@ -8,6 +8,12 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 管理员账户仓储层.
+ * <p>提供对admin表的数据访问操作.</p>
+ *
+ * @author system
+ */
 @Repository
 public interface AdminRepository extends JpaRepository<Admin, Long>, JpaSpecificationExecutor<Admin> {
 

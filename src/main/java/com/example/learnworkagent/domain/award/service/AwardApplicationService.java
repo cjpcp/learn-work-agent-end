@@ -33,6 +33,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
+/**
+ * 奖助申请服务.
+ * <p>提供奖助学金的申请、审批、查询等业务逻辑.</p>
+ *
+ * @author system
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -231,5 +237,17 @@ public class AwardApplicationService {
 
     private Specification<AwardApplication> buildPendingApplicationsSpecification(List<Long> applicationIds) {
         return (root, query, criteriaBuilder) -> root.get("id").in(applicationIds);
+    }
+
+    @Transactional
+    public void cancelAwardApplication(Long applicationId, Long userId) {
+        AwardApplication application = getApplicationById(applicationId);
+        if (!application.getApplicantId().equals(userId)) {
+            throw new BusinessException(ResultCode.FORBIDDEN, "无权操作此申请");
+        }
+        if (!ApprovalStatusEnum.PENDING.getCode().equals(application.getApprovalStatus())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "只能撤销待审批的申请");
+        }
+        approvalService.cancelApprovalInstance(BUSINESS_TYPE_AWARD, applicationId);
     }
 }

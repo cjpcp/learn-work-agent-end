@@ -22,6 +22,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 流程记录服务.
+ * <p>提供待办和已完成流程的查询等业务逻辑.</p>
+ *
+ * @author system
+ */
 @Service
 @RequiredArgsConstructor
 public class ProcessService {

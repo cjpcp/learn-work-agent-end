@@ -12,13 +12,20 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 咨询问题仓库
+ * 咨询问题仓储层.
+ * <p>提供对consultation_question表的数据访问操作.</p>
+ *
+ * @author system
  */
 @Repository
 public interface ConsultationQuestionRepository extends JpaRepository<ConsultationQuestion, Long> {
 
     /**
-     * 根据用户ID分页查询
+     * 根据用户ID分页查询咨询问题列表.
+     *
+     * @param userId   用户ID
+     * @param pageable 分页参数
+     * @return 咨询问题分页列表
      */
     Page<ConsultationQuestion> findByUserIdAndDeletedFalseOrderByCreateTimeDesc(Long userId, Pageable pageable);
 

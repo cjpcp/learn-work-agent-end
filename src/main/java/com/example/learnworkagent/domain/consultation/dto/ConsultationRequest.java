@@ -6,7 +6,10 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 咨询请求DTO
+ * 咨询请求DTO.
+ * <p>封装用户提交咨询问题的请求参数.</p>
+ *
+ * @author system
  */
 @Data
 public class ConsultationRequest {

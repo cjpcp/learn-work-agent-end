@@ -10,7 +10,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 奖助申请实体
+ * 奖助申请实体.
+ * <p>对应数据库中的award_application表，存储奖助学金申请信息.</p>
+ *
+ * @author system
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -120,9 +123,9 @@ public class AwardApplication extends BaseEntity {
     /**
      * 院系
      */
-    @Comment("院系ID")
-    @Column(name = "department_id")
-    private Long departmentId;
+    @Comment("院系名称")
+    @Column(name = "department_name", length = 100)
+    private String departmentName;
 
     /**
      * 年级

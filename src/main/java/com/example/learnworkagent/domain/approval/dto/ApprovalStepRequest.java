@@ -4,6 +4,12 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+/**
+ * 审批步骤请求DTO.
+ * <p>封装审批步骤的创建/更新请求参数.</p>
+ *
+ * @author system
+ */
 @Data
 public class ApprovalStepRequest {
 

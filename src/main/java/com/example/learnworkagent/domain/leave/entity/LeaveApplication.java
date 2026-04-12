@@ -14,7 +14,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * 请假申请实体。
+ * 请假申请实体.
+ * <p>对应数据库中的leave_application表，存储学生请假申请信息.</p>
+ *
+ * @author system
  */
 @Data
 @EqualsAndHashCode(callSuper = true)

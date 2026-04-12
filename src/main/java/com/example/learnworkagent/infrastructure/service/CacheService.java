@@ -7,7 +7,10 @@ import org.springframework.stereotype.Service;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 缓存服务
+ * 缓存服务.
+ * <p>基于Redis提供键值对缓存功能.</p>
+ *
+ * @author system
  */
 @Slf4j
 @Service

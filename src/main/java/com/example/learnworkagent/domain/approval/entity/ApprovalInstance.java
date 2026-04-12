@@ -10,7 +10,10 @@ import lombok.EqualsAndHashCode;
 import java.time.LocalDateTime;
 
 /**
- * 审批实例
+ * 审批实例实体.
+ * <p>对应数据库中的approval_instance表，记录每次审批流程的实例.</p>
+ *
+ * @author system
  */
 @Data
 @EqualsAndHashCode(callSuper = true)

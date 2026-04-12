@@ -22,7 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 /**
- * 认证服务
+ * 认证服务.
+ * <p>提供用户登录、注册、密码校验等认证相关业务逻辑.</p>
+ *
+ * @author system
  */
 @Slf4j
 @Service
@@ -38,6 +41,14 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final RsaUtil rsaUtil;
 
+    /**
+     * 用户登录.
+     * <p>验证用户名密码，校验账户状态，构建登录响应（含JWT Token）.</p>
+     *
+     * @param request 登录请求（用户名、密码）
+     * @return 登录成功响应（Token、用户信息）
+     * @throws BusinessException 用户名不存在、密码错误、账户被禁用时抛出
+     */
     public LoginResponse login(LoginRequest request) {
         Admin admin = adminRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "用户名或密码错误"));
@@ -65,6 +76,14 @@ public class AuthService {
         return buildLoginResponse(admin, role, teacher);
     }
 
+    /**
+     * 用户注册.
+     * <p>创建新用户账号，若需要同时创建关联的教师信息.</p>
+     *
+     * @param request 注册请求（用户名、密码、角色等）
+     * @return 注册成功响应（Token、用户信息）
+     * @throws BusinessException 用户名已存在、角色不存在时抛出
+     */
     @Transactional
     public LoginResponse register(RegisterRequest request) {
         if (adminRepository.existsByUsername(request.getUsername())) {
@@ -90,6 +109,12 @@ public class AuthService {
         return buildLoginResponse(savedAdmin, role, teacher);
     }
 
+    /**
+     * 检查用户名是否已被使用.
+     *
+     * @param username 待检查的用户名
+     * @return true表示用户名已存在，false表示可用
+     */
     public boolean checkUsernameExists(String username) {
         if (username == null || username.trim().isEmpty()) {
             return false;
@@ -97,6 +122,12 @@ public class AuthService {
         return adminRepository.existsByUsername(username.trim());
     }
 
+    /**
+     * 根据注册请求创建教师信息（仅当teacher字段为true时创建）.
+     *
+     * @param request 注册请求
+     * @return 创建的教师实体，若不需要创建则返回null
+     */
     private Teacher createTeacherIfRequired(RegisterRequest request) {
         if (!Boolean.TRUE.equals(request.getTeacher())) {
             return null;
@@ -115,6 +146,12 @@ public class AuthService {
         return teacherRepository.save(teacher);
     }
 
+    /**
+     * 根据教师ID加载教师信息（若存在）.
+     *
+     * @param teacherId 教师ID
+     * @return 教师实体，若不存在则返回null
+     */
     private Teacher loadTeacherIfPresent(Long teacherId) {
         if (teacherId == null || teacherId <= 0) {
             return null;
@@ -123,6 +160,14 @@ public class AuthService {
                 .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "账户关联教师不存在"));
     }
 
+    /**
+     * 构建登录响应对象.
+     *
+     * @param admin   管理员实体
+     * @param role    角色实体
+     * @param teacher 教师实体（可为null）
+     * @return 登录响应对象
+     */
     private LoginResponse buildLoginResponse(Admin admin, Role role, Teacher teacher) {
         String token = jwtUtil.generateToken(admin.getId(), admin.getUsername(), role.getRoleName());
         return new LoginResponse(
@@ -138,6 +183,12 @@ public class AuthService {
         );
     }
 
+    /**
+     * 校验教师相关字段是否完整.
+     *
+     * @param request 注册请求
+     * @throws BusinessException 字段为空时抛出
+     */
     private void validateTeacherFields(RegisterRequest request) {
         if (isBlank(request.getTeacherName())) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "教师姓名不能为空");

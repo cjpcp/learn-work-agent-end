@@ -23,7 +23,11 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * 系统控制器
+ * 系统控制器.
+ * <p>提供系统公共接口，包括角色查询、用户管理等功能.</p>
+ *
+ * @author system
+ * @see UserService
  */
 @Tag(name = "系统管理", description = "系统公共接口")
 @RestController
@@ -35,18 +39,39 @@ public class SystemController extends BaseController {
     private final TeacherRepository teacherRepository;
     private final UserService userService;
 
+    /**
+     * 获取可选的角色列表（用于用户注册/编辑时的角色选择）.
+     *
+     * @return 角色选项列表
+     */
     @Operation(summary = "获取可选角色列表")
     @GetMapping("/roles/staff")
     public Result<List<Map<String, Object>>> getStaffRoles() {
         return Result.success(getRoleOptions());
     }
 
+    /**
+     * 获取所有角色的列表.
+     *
+     * @return 角色列表
+     */
     @Operation(summary = "获取所有角色列表")
     @GetMapping("/roles")
     public Result<List<Map<String, Object>>> getAllRoles() {
         return Result.success(getRoleOptions());
     }
 
+    /**
+     * 分页获取用户列表，支持多条件筛选.
+     *
+     * @param pageRequest      分页参数
+     * @param roleId          角色ID筛选（可选）
+     * @param teacherKeyword   教师姓名/卡号关键词筛选（可选）
+     * @param username         用户名筛选（可选）
+     * @param nick             昵称筛选（可选）
+     * @param status           状态筛选（可选）
+     * @return 分页后的用户列表
+     */
     @Operation(summary = "分页获取用户列表")
     @GetMapping("/users")
     public Result<PageResult<Map<String, Object>>> getUsers(PageRequest pageRequest,

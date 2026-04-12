@@ -8,7 +8,10 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.util.concurrent.Executor;
 
 /**
- * 异步配置
+ * 异步任务配置类.
+ * <p>配置线程池用于异步方法执行.</p>
+ *
+ * @author system
  */
 @Configuration
 @EnableAsync

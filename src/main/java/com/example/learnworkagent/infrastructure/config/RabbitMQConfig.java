@@ -10,7 +10,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * RabbitMQ配置
+ * RabbitMQ配置类.
+ * <p>配置消息队列、消息转换器和监听器容器.</p>
+ *
+ * @author system
  */
 @Configuration
 public class RabbitMQConfig {

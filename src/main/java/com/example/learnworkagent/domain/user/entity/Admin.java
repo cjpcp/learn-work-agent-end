@@ -12,7 +12,10 @@ import org.hibernate.annotations.Comment;
 import java.time.LocalDateTime;
 
 /**
- * 管理员账户实体
+ * 管理员账户实体.
+ * <p>对应数据库中的admin表，存储系统用户账户信息.</p>
+ *
+ * @author system
  */
 @Data
 @Entity

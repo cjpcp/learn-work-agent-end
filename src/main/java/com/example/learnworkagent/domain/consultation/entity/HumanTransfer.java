@@ -7,7 +7,10 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
- * 人工转接记录实体
+ * 人工转接记录实体.
+ * <p>对应数据库中的human_transfer表，记录每次转人工的处理情况.</p>
+ *
+ * @author system
  */
 @Data
 @EqualsAndHashCode(callSuper = true)

@@ -17,7 +17,10 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 import java.time.Duration;
 
 /**
- * Redis配置
+ * Redis配置类.
+ * <p>配置Redis连接工厂、缓存管理器和序列化策略.</p>
+ *
+ * @author system
  */
 @Configuration
 @EnableCaching

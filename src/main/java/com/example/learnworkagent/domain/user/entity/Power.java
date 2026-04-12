@@ -10,7 +10,10 @@ import org.hibernate.annotations.Comment;
 import java.time.LocalDateTime;
 
 /**
- * 权限实体
+ * 权限实体.
+ * <p>对应数据库中的power表，定义系统权限信息.</p>
+ *
+ * @author system
  */
 @Data
 @Entity

@@ -23,7 +23,10 @@ import java.util.Collections;
 import java.util.Optional;
 
 /**
- * JWT认证过滤器
+ * JWT认证过滤器.
+ * <p>从请求头中解析JWT Token并设置Spring Security认证上下文.</p>
+ *
+ * @author system
  */
 @Slf4j
 @Component

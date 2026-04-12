@@ -11,6 +11,12 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.Comment;
 
+/**
+ * 审批步骤实体.
+ * <p>对应数据库中的approval_stage表，定义审批流程中的单个步骤.</p>
+ *
+ * @author system
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Entity

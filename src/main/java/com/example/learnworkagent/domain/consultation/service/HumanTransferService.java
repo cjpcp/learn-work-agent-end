@@ -20,7 +20,10 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 
 /**
- * 人工转接服务
+ * 人工转接服务.
+ * <p>提供转接记录的创建、状态管理和查询等业务逻辑.</p>
+ *
+ * @author system
  */
 @Slf4j
 @Service

@@ -10,7 +10,10 @@ import lombok.Data;
 import org.hibernate.annotations.Comment;
 
 /**
- * 教师实体
+ * 教师实体.
+ * <p>对应数据库中的teacher表，存储教师基本信息.</p>
+ *
+ * @author system
  */
 @Data
 @Entity

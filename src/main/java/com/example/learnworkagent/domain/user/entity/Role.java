@@ -10,7 +10,10 @@ import org.hibernate.annotations.Comment;
 import java.time.LocalDateTime;
 
 /**
- * 角色实体
+ * 角色实体.
+ * <p>对应数据库中的role表，定义系统用户角色及权限关联.</p>
+ *
+ * @author system
  */
 @Data
 @Entity

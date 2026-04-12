@@ -8,7 +8,10 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Dify智能咨询请求DTO
+ * Dify智能咨询请求DTO.
+ * <p>封装调用Dify服务进行智能问答的请求参数.</p>
+ *
+ * @author system
  */
 @Data
 public class DifyConsultationRequest {

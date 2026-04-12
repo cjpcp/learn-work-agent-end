@@ -8,13 +8,20 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 /**
- * 审批任务仓库
+ * 审批任务仓储层.
+ * <p>提供对approval_task表的数据访问操作.</p>
+ *
+ * @author system
  */
 @Repository
 public interface ApprovalTaskRepository extends JpaRepository<ApprovalTask, Long> {
 
     /**
-     * 根据审批人ID和状态查询待审批任务
+     * 根据审批人ID和状态查询待审批任务.
+     *
+     * @param approverId 审批人ID
+     * @param status     任务状态
+     * @return 待审批任务列表
      */
     List<ApprovalTask> findByApproverIdAndStatus(Long approverId, String status);
 
@@ -27,5 +34,13 @@ public interface ApprovalTaskRepository extends JpaRepository<ApprovalTask, Long
      * 根据审批实例和步骤顺序查询任务
      */
     List<ApprovalTask> findByInstanceAndStepStepOrderOrderByTaskOrderAsc(ApprovalInstance instance, Integer stepOrder);
+
+    /**
+     * 根据审批实例ID查询所有任务.
+     *
+     * @param instanceId 审批实例ID
+     * @return 任务列表
+     */
+    List<ApprovalTask> findByInstanceId(Long instanceId);
 
 }

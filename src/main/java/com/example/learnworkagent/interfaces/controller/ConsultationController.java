@@ -33,10 +33,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 咋询控制器
+ * 咨询控制器.
+ * <p>提供智能咨询的问答、文件上传、转人工等接口.</p>
+ *
+ * @author system
+ * @see ConsultationService
  */
 @Slf4j
-@Tag(name = "智能咋询", description = "智能咋询助手相关接口")
+@Tag(name = "智能咨询", description = "智能咨询助手相关接口")
 @RestController
 @RequestMapping("/api/v1/consultation")
 @RequiredArgsConstructor
@@ -48,7 +52,13 @@ public class ConsultationController extends BaseController {
     private final OssService ossService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Operation(summary = "提交咋询问题")
+    /**
+     * 提交咨询问题.
+     *
+     * @param request 咨询请求参数
+     * @return 创建的咨询问题
+     */
+    @Operation(summary = "提交咨询问题")
     @PostMapping("/questions")
     public Result<ConsultationQuestion> submitQuestion(@Valid @RequestBody ConsultationRequest request) {
         Long userId = getCurrentUserId();
@@ -64,6 +74,12 @@ public class ConsultationController extends BaseController {
         return Result.success(question);
     }
 
+    /**
+     * 获取咨询问题详情.
+     *
+     * @param id 问题ID
+     * @return 咨询问题详情
+     */
     @Operation(summary = "获取问题详情")
     @GetMapping("/questions/{id}")
     public Result<ConsultationQuestion> getQuestion(@PathVariable Long id) {
@@ -71,6 +87,12 @@ public class ConsultationController extends BaseController {
         return Result.success(question);
     }
 
+    /**
+     * 获取咨询问题的对话历史.
+     *
+     * @param id 问题ID
+     * @return 对话消息列表
+     */
     @Operation(summary = "获取问题对话历史")
     @GetMapping("/questions/{id}/history")
     public Result<List<ConversationMessageDTO>> getQuestionHistory(@PathVariable Long id) {
@@ -78,6 +100,12 @@ public class ConsultationController extends BaseController {
         return Result.success(history);
     }
 
+    /**
+     * 分页查询当前用户的咨询问题.
+     *
+     * @param pageRequest 分页请求参数
+     * @return 分页后的咨询问题列表
+     */
     @Operation(summary = "分页查询我的问题")
     @GetMapping("/questions/my")
     public Result<PageResult<ConsultationQuestion>> getMyQuestions(@Valid PageRequest pageRequest) {
@@ -86,7 +114,13 @@ public class ConsultationController extends BaseController {
         return Result.success(result);
     }
 
-
+    /**
+     * 申请转人工服务.
+     *
+     * @param id      问题ID
+     * @param request 转人工请求参数
+     * @return 操作结果
+     */
     @Operation(summary = "申请转人工")
     @PostMapping("/questions/{id}/transfer")
     public Result<Void> transferToHuman(@PathVariable Long id, @RequestBody TransferToHumanRequest request) {
@@ -95,7 +129,14 @@ public class ConsultationController extends BaseController {
         return Result.success();
     }
 
-    @Operation(summary = "提交咋询问题（流式响应）")
+    /**
+     * 提交咨询问题并以流式方式返回响应.
+     * <p>使用SSE实现流式响应，超时时间120秒.</p>
+     *
+     * @param request 咨询请求参数
+     * @return SSEEmitter用于推送流式响应
+     */
+    @Operation(summary = "提交咨询问题（流式响应）")
     @PostMapping(value = "/questions/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter submitQuestionStream(@Valid @RequestBody ConsultationRequest request) {
         final Long userId = getCurrentUserId();
@@ -168,7 +209,13 @@ public class ConsultationController extends BaseController {
         return emitter;
     }
 
-    @Operation(summary = "上传咋询语音")
+    /**
+     * 上传咨询语音文件.
+     *
+     * @param file 语音文件
+     * @return 语音文件的OSS访问URL
+     */
+    @Operation(summary = "上传咨询语音")
     @PostMapping(value = "/upload/voice", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Result<String> uploadVoice(@RequestParam("file") MultipartFile file) {
         Long userId = getCurrentUserId();
@@ -176,7 +223,13 @@ public class ConsultationController extends BaseController {
         return Result.success(voiceUrl);
     }
 
-    @Operation(summary = "上传咋询文件")
+    /**
+     * 上传咨询附件文件.
+     *
+     * @param file 附件文件
+     * @return 文件的OSS访问URL
+     */
+    @Operation(summary = "上传咨询文件")
     @PostMapping(value = "/upload/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Result<String> uploadFile(@RequestParam("file") MultipartFile file) {
         Long userId = getCurrentUserId();
@@ -185,7 +238,13 @@ public class ConsultationController extends BaseController {
     }
 
     /**
-     * 提交咋询问题（流式响应＋附件同步上传）
+     * 提交咨询问题（流式响应+附件同步上传）.
+     * <p>支持同时上传语音和附件，使用SSE实现流式响应，超时时间120秒.</p>
+     *
+     * @param questionText 问题文本
+     * @param sessionId    会话ID
+     * @param files        附件列表（语音或文件）
+     * @return SSEEmitter用于推送流式响应
      */
     @Operation(summary = "提交咨询问题（流式响应+附件同步上传）")
     @PostMapping(value = "/questions/stream/multipart", produces = MediaType.TEXT_EVENT_STREAM_VALUE,

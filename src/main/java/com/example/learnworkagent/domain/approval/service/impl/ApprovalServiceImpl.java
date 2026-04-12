@@ -458,4 +458,22 @@ public class ApprovalServiceImpl implements ApprovalService {
     private String resolveApplicantStatusText(String finalStatus) {
         return INSTANCE_APPROVED.equals(finalStatus) ? STATUS_TEXT_APPROVED : STATUS_TEXT_REJECTED;
     }
+
+    @Override
+    public void cancelApprovalInstance(String businessType, Long businessId) {
+        ApprovalInstance instance = getApprovalInstance(businessType, businessId);
+        if (instance == null) {
+            return;
+        }
+        List<ApprovalTask> tasks = taskRepository.findByInstanceId(instance.getId());
+        tasks.forEach(task -> {
+            if (TASK_PROCESSING.equals(task.getStatus())) {
+                task.markRejected("申请人撤销申请");
+                taskRepository.save(task);
+            }
+        });
+        instance.markRejected();
+        instanceRepository.save(instance);
+        updateBusinessStatus(instance, null, "申请人撤销申请");
+    }
 }

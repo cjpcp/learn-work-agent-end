@@ -12,7 +12,10 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * 通知消息实体，用于 RabbitMQ 传输。
+ * 通知消息实体.
+ * <p>用于RabbitMQ消息队列传输的通知信息，包含接收人、消息内容等.</p>
+ *
+ * @author system
  */
 @Data
 @Builder

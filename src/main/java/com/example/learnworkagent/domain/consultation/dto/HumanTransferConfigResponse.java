@@ -5,6 +5,12 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * 人工转接配置响应DTO.
+ * <p>封装人工转接规则的展示信息.</p>
+ *
+ * @author system
+ */
 @Data
 @Builder
 public class HumanTransferConfigResponse {

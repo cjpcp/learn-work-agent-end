@@ -6,6 +6,12 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+/**
+ * 角色仓储层.
+ * <p>提供对role表的数据访问操作.</p>
+ *
+ * @author system
+ */
 @Repository
 public interface RoleRepository extends JpaRepository<Role, Long> {
 

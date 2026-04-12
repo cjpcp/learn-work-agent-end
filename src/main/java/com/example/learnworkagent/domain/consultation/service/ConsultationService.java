@@ -24,7 +24,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 咨询服务
+ * 咨询服务.
+ * <p>提供咨询问题的提交、查询、历史记录等业务逻辑.</p>
+ *
+ * @author system
  */
 @Slf4j
 @Service
@@ -37,7 +40,17 @@ public class ConsultationService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
-     * 提交咨询问题
+     * 提交咨询问题.
+     * <p>创建问题记录后，异步调用Agent服务进行智能回答.</p>
+     *
+     * @param userId      提问用户ID
+     * @param questionText 问题文本内容
+     * @param questionType 问题类型（TEXT/VOICE）
+     * @param category    问题分类
+     * @param voiceUrl    语音文件URL（可选）
+     * @param sessionId   会话ID（可选，用于关联多轮对话）
+     * @param files       附件列表（可选）
+     * @return 创建的咨询问题记录
      */
     @Transactional
     public ConsultationQuestion submitQuestion(Long userId, String questionText, String questionType,
@@ -55,14 +68,17 @@ public class ConsultationService {
 
         ConsultationQuestion saved = consultationQuestionRepository.save(question);
 
-        // 异步调用Agent服务进行智能回答
         consultationAgentService.processQuestionAsync(saved.getId());
 
         return saved;
     }
 
     /**
-     * 获取问题详情
+     * 根据ID获取咨询问题详情.
+     *
+     * @param questionId 问题ID
+     * @return 咨询问题详情
+     * @throws BusinessException 问题不存在时抛出
      */
     public ConsultationQuestion getQuestionById(Long questionId) {
         return consultationQuestionRepository.findById(questionId)
@@ -70,7 +86,11 @@ public class ConsultationService {
     }
 
     /**
-     * 分页查询用户的问题
+     * 分页查询指定用户的咨询问题.
+     *
+     * @param userId      用户ID
+     * @param pageRequest 分页参数
+     * @return 分页后的咨询问题列表
      */
     public PageResult<ConsultationQuestion> getUserQuestions(Long userId, PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
@@ -91,7 +111,12 @@ public class ConsultationService {
     }
 
     /**
-     * 查询用户在指定问题之前（含）的历史咨询记录
+     * 查询指定会话中，在指定问题之前的咨询历史记录.
+     * <p>如果问题存在sessionId，则查询同一会话的所有记录；否则查询用户在该问题之前的历史.</p>
+     *
+     * @param userId     用户ID
+     * @param questionId 问题ID（作为时间锚点）
+     * @return 咨询问题历史列表
      */
     public List<ConsultationQuestion> getHistoryByUserIdUpToQuestion(Long userId, Long questionId) {
         ConsultationQuestion question = consultationQuestionRepository.findById(questionId).orElse(null);
@@ -102,9 +127,11 @@ public class ConsultationService {
     }
 
     /**
-     * 获取问题的对话历史详情
-     * 如果存在 conversation_id，则从 Dify 获取完整对话历史
-     * 否则返回本地存储的问题信息
+     * 获取指定问题的对话历史详情.
+     * <p>如果存在conversationId，则从Dify服务获取完整对话历史；否则返回本地存储的问题信息.</p>
+     *
+     * @param questionId 问题ID
+     * @return 对话消息列表
      */
     public List<ConversationMessageDTO> getConversationHistory(Long questionId) {
         ConsultationQuestion question = getQuestionById(questionId);
@@ -145,7 +172,10 @@ public class ConsultationService {
     }
 
     /**
-     * 评价问题回答
+     * 对指定问题的回答进行满意度评价.
+     *
+     * @param questionId        问题ID
+     * @param satisfactionScore 满意度评分
      */
     @Transactional
     public void rateQuestion(Long questionId, Integer satisfactionScore) {
@@ -155,12 +185,21 @@ public class ConsultationService {
     }
 
     /**
-     * 提交咨询问题（流式响应）
+     * 提交咨询问题并返回流式响应.
+     * <p>用于需要实时获取AI回答的场景，返回Flux流式响应.</p>
+     *
+     * @param userId      提问用户ID
+     * @param questionText 问题文本内容
+     * @param questionType 问题类型（TEXT/VOICE）
+     * @param category    问题分类
+     * @param voiceUrl    语音文件URL（可选）
+     * @param sessionId   会话ID（可选）
+     * @param files       附件列表（可选）
+     * @return AI回答内容的流
      */
     public Flux<String> submitQuestionStream(Long userId, String questionText, String questionType,
                                              String category, String voiceUrl, String sessionId,
                                              List<ConsultationRequest.FileInput> files) {
-        // 保存问题
         ConsultationQuestion question = new ConsultationQuestion();
         question.setUserId(userId);
         question.setQuestionText(questionText);
@@ -179,7 +218,10 @@ public class ConsultationService {
     }
 
     /**
-     * 将文件列表的 URL 序列化为 JSON 字符串保存到数据库
+     * 将文件列表序列化为JSON字符串.
+     *
+     * @param files 文件输入列表
+     * @return JSON字符串，若无文件则返回null
      */
     private String serializeFileUrls(List<ConsultationRequest.FileInput> files) {
         if (files == null || files.isEmpty()) return null;

@@ -27,7 +27,10 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 咨询Agent服务（用于高频问题解答和多模态交互）
+ * 咨询Agent服务.
+ * <p>用于高频问题解答和多模态交互，提供异步处理问题和流式响应等功能.</p>
+ *
+ * @author system
  */
 @Slf4j
 @Service

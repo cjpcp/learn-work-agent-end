@@ -8,7 +8,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Swagger配置
+ * Swagger配置类.
+ * <p>配置OpenAPI文档信息，包括标题、版本、描述等.</p>
+ *
+ * @author system
  */
 @Configuration
 public class SwaggerConfig {

@@ -8,6 +8,12 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.Comment;
 
+/**
+ * 审批流程实体.
+ * <p>对应数据库中的approval_process表，定义审批流程的模板信息.</p>
+ *
+ * @author system
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Entity

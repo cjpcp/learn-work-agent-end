@@ -23,6 +23,12 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+/**
+ * 人工转接配置服务.
+ * <p>提供人工转接规则的配置、查询和转接分配逻辑.</p>
+ *
+ * @author system
+ */
 @Service
 @RequiredArgsConstructor
 public class HumanTransferConfigService {

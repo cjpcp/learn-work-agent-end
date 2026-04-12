@@ -5,7 +5,10 @@ import jakarta.validation.constraints.Max;
 import lombok.Data;
 
 /**
- * 分页请求DTO
+ * 分页请求DTO.
+ * <p>封装分页查询的页码、每页大小和排序参数.</p>
+ *
+ * @author system
  */
 @Data
 public class PageRequest {

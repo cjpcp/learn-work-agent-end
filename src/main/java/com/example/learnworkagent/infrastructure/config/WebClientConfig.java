@@ -6,7 +6,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 
 /**
- * WebClient配置（用于调用外部API）
+ * WebClient配置类.
+ * <p>配置HTTP客户端用于调用外部API.</p>
+ *
+ * @author system
  */
 @Configuration
 public class WebClientConfig {

@@ -7,7 +7,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 
 /**
- * 安全异步配置 - 确保SecurityContext在异步操作中传播
+ * Web异步配置类.
+ * <p>配置异步请求支持，确保SecurityContext在异步操作中传播.</p>
+ *
+ * @author system
  */
 @Configuration
 @EnableAsync

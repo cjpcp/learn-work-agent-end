@@ -6,6 +6,12 @@ import lombok.Data;
 
 import java.time.LocalDate;
 
+/**
+ * 请假申请请求DTO.
+ * <p>封装请假申请的类型、日期、原因等请求参数.</p>
+ *
+ * @author system
+ */
 @Data
 public class LeaveApplicationRequest {
 

@@ -9,7 +9,10 @@ import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.Comment;
 
 /**
- * 人工转接配置
+ * 人工转接配置实体.
+ * <p>对应数据库中的human_transfer_config表，定义问题转人工的规则配置.</p>
+ *
+ * @author system
  */
 @Data
 @EqualsAndHashCode(callSuper = true)

@@ -40,7 +40,10 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * 请假申请服务。
+ * 请假申请服务.
+ * <p>提供请假申请、审批、销假等业务逻辑.</p>
+ *
+ * @author system
  */
 @Slf4j
 @Service
@@ -343,6 +346,18 @@ public class LeaveApplicationService {
                 pageRequest.getPageNum(),
                 pageRequest.getPageSize()
         );
+    }
+
+    @Transactional
+    public void withdrawApplication(Long applicationId, Long userId) {
+        LeaveApplication application = getApplicationById(applicationId);
+        if (!application.getApplicantId().equals(userId)) {
+            throw new BusinessException(ResultCode.FORBIDDEN, "无权操作此申请");
+        }
+        if (!ApprovalStatusEnum.PENDING.getCode().equals(application.getApprovalStatus())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "只能撤销待审批的申请");
+        }
+        approvalService.cancelApprovalInstance(BUSINESS_TYPE_LEAVE, applicationId);
     }
 
 
