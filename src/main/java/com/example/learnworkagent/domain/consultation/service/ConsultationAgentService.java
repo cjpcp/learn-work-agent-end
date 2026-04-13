@@ -81,12 +81,6 @@ public class ConsultationAgentService {
             log.info("开始处理问题，问题ID: {}", questionId);
             log.info("开始处理问题，问题内容: {}", question);
 
-            // 检查是否需要转人工，如需要转人工，则将问题状态设置为转人工
-            if (shouldTransferToHuman(question)) {
-                self.transferToHuman(question);
-                return;
-            }
-
             // 尝试从缓存获取答案
             String cachedAnswer = getCachedAnswer(question);
             if (cachedAnswer != null) {
@@ -125,21 +119,6 @@ public class ConsultationAgentService {
         } catch (Exception e) {
             log.error("处理问题失败，问题ID: {}", questionId, e);
         }
-    }
-
-    /**
-     * todo需要对判断是否人工处理逻辑进行修改，不应该仅因为问题包含敏感关键词就转人工
-     * 判断是否需要转人工
-     */
-    private boolean shouldTransferToHuman(ConsultationQuestion question) {
-        // 检查是否包含敏感关键词（如：申诉、特殊情况等）
-        String questionText = question.getQuestionText();
-        if (questionText != null) {
-            String lowerText = questionText.toLowerCase();
-            return lowerText.contains("申诉") || lowerText.contains("特殊情况")
-                    || lowerText.contains("投诉") || lowerText.contains("紧急");
-        }
-        return false;
     }
 
     /**
@@ -283,19 +262,6 @@ public class ConsultationAgentService {
                         .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "问题不存在")))
                 .subscribeOn(Schedulers.boundedElastic())  // 使用专门的阻塞线程池
                 .flatMapMany(question -> {
-
-                    //检查问题是否转人工
-                    if (shouldTransferToHuman(question)) {
-                        log.info("问题需要转人工，问题ID: {}", questionId);
-
-                        //使用专门的线程池来处理阻塞任务
-                        Mono.fromRunnable(() -> self.transferToHuman(question))
-                                .subscribeOn(Schedulers.boundedElastic())
-                                .doOnError(error -> log.error("问题需要转人工失败，问题ID: {}", questionId, error))
-                                .subscribe();
-
-                        return Flux.just("抱歉，这个问题需要人工处理，已为您转接到人工客服。");
-                    }
 
                     //检查缓存中是否有答案或需要更新答案
                     String cachedAnswer = getCachedAnswer(question);
