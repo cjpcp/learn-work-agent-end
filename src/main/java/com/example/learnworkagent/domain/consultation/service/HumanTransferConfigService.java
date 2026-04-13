@@ -84,6 +84,26 @@ public class HumanTransferConfigService {
         return null;
     }
 
+    public boolean isCurrentUserInTransferConfig(Long userId, Long roleId) {
+        if (userId == null) {
+            return false;
+        }
+        List<HumanTransferConfig> userConfigs = configRepository.findByAssignModeAndEnabledTrueAndDeletedFalse(ASSIGN_MODE_USER);
+        for (HumanTransferConfig config : userConfigs) {
+            List<Long> userIds = parseUserIds(config.getUserIds());
+            if (userIds.contains(userId)) {
+                return true;
+            }
+        }
+        List<HumanTransferConfig> roleConfigs = configRepository.findByAssignModeAndEnabledTrueAndDeletedFalse(ASSIGN_MODE_ROLE);
+        for (HumanTransferConfig config : roleConfigs) {
+            if (config.getRoleId() != null && config.getRoleId().equals(roleId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Long resolveFromConfigs(List<HumanTransferConfig> configs) {
         for (HumanTransferConfig config : configs) {
             if (ASSIGN_MODE_USER.equalsIgnoreCase(config.getAssignMode())) {

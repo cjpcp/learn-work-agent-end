@@ -13,6 +13,9 @@ import com.example.learnworkagent.domain.consultation.entity.HumanTransfer;
 import com.example.learnworkagent.domain.consultation.repository.HumanTransferRepository;
 import com.example.learnworkagent.domain.consultation.service.ConsultationService;
 import com.example.learnworkagent.domain.consultation.service.HumanTransferService;
+import com.example.learnworkagent.domain.consultation.service.HumanTransferConfigService;
+import com.example.learnworkagent.domain.user.entity.Admin;
+import com.example.learnworkagent.domain.user.repository.AdminRepository;
 import com.example.learnworkagent.infrastructure.external.oss.OssService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,7 +51,9 @@ public class ConsultationController extends BaseController {
 
     private final ConsultationService consultationService;
     private final HumanTransferService humanTransferService;
+    private final HumanTransferConfigService humanTransferConfigService;
     private final HumanTransferRepository humanTransferRepository;
+    private final AdminRepository adminRepository;
     private final OssService ossService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -424,5 +429,20 @@ public class ConsultationController extends BaseController {
         Long staffId = getCurrentUserId();
         PageResult<HumanTransfer> result = humanTransferService.getCompletedTransfers(staffId, pageRequest);
         return Result.success(result);
+    }
+
+    @Operation(summary = "检查当前用户是否有权限查看人工处理中心")
+    @GetMapping("/transfer-config/permission")
+    public Result<Boolean> checkTransferConfigPermission() {
+        Long userId = getCurrentUserId();
+        if (userId == null) {
+            return Result.success(false);
+        }
+        Admin admin = adminRepository.findById(userId).orElse(null);
+        if (admin == null) {
+            return Result.success(false);
+        }
+        boolean hasPermission = humanTransferConfigService.isCurrentUserInTransferConfig(userId, admin.getRoleId());
+        return Result.success(hasPermission);
     }
 }
