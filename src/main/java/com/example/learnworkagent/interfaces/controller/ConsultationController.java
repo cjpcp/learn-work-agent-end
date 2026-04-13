@@ -347,6 +347,33 @@ public class ConsultationController extends BaseController {
 
                 fileInputs.isEmpty() ? null : fileInputs);
 
+        try {
+            Map<String, Object> userMessage = new HashMap<>();
+            userMessage.put("questionText", questionText);
+            List<Map<String, Object>> fileMaps = new java.util.ArrayList<>();
+            if (fileInputs != null) {
+                for (ConsultationRequest.FileInput fi : fileInputs) {
+                    Map<String, Object> fm = new HashMap<>();
+                    fm.put("url", fi.getUrl());
+                    fm.put("type", fi.getType());
+                    String fileName = extractFileNameFromUrl(fi.getUrl());
+                    fm.put("name", fileName != null ? fileName : "附件");
+                    fileMaps.add(fm);
+                }
+            }
+            if (uploadedVoiceUrl != null && !uploadedVoiceUrl.isBlank()) {
+                Map<String, Object> voiceFile = new HashMap<>();
+                voiceFile.put("url", uploadedVoiceUrl);
+                voiceFile.put("type", "audio");
+                voiceFile.put("name", "语音");
+                fileMaps.add(voiceFile);
+            }
+            userMessage.put("files", fileMaps.isEmpty() ? null : fileMaps);
+            userMessage.put("messageType", "user");
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(userMessage)));
+        } catch (IOException e) {
+            log.error("发送用户消息SSE失败", e);
+        }
 
         responseFlux.publishOn(Schedulers.boundedElastic()).subscribe(
                 chunk -> {
@@ -368,6 +395,7 @@ public class ConsultationController extends BaseController {
                 },
                 emitter::complete
         );
+
         return emitter;
     }
 
@@ -444,5 +472,23 @@ public class ConsultationController extends BaseController {
         }
         boolean hasPermission = humanTransferConfigService.isCurrentUserInTransferConfig(userId, admin.getRoleId());
         return Result.success(hasPermission);
+    }
+
+    private String extractFileNameFromUrl(String url) {
+        if (url == null || url.isBlank()) return null;
+        int lastSlash = url.lastIndexOf('/');
+        if (lastSlash >= 0 && lastSlash < url.length() - 1) {
+            String name = url.substring(lastSlash + 1);
+            int questionIdx = name.indexOf('?');
+            if (questionIdx > 0) {
+                name = name.substring(0, questionIdx);
+            }
+            try {
+                name = java.net.URLDecoder.decode(name, java.nio.charset.StandardCharsets.UTF_8.name());
+            } catch (Exception ignored) {
+            }
+            return name;
+        }
+        return "附件";
     }
 }

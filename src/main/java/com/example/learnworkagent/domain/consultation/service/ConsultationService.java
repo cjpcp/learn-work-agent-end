@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -168,6 +170,35 @@ public class ConsultationService {
         dto.setAnswer(question.getAiAnswer());
         dto.setMessageType(question.getQuestionType());
         dto.setCreatedAt(question.getCreateTime() != null ? question.getCreateTime().toString() : null);
+        String fileUrlsJson = question.getFileUrls();
+        if (fileUrlsJson != null && !fileUrlsJson.isBlank()) {
+            try {
+                List<String> urls = objectMapper.readValue(fileUrlsJson, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                if (urls != null && !urls.isEmpty()) {
+                    List<Map<String, Object>> files = new ArrayList<>();
+                    for (String url : urls) {
+                        Map<String, Object> fileMap = new HashMap<>();
+                        fileMap.put("url", url);
+                        String lower = url.toLowerCase();
+                        fileMap.put("type", lower.matches(".*\\.(jpg|jpeg|png|gif|webp|bmp)$") ? "image" : "document");
+                        int lastSlash = url.lastIndexOf('/');
+                        if (lastSlash >= 0 && lastSlash < url.length() - 1) {
+                            String name = url.substring(lastSlash + 1);
+                            int qIdx = name.indexOf('?');
+                            if (qIdx > 0) name = name.substring(0, qIdx);
+                            try { name = java.net.URLDecoder.decode(name, java.nio.charset.StandardCharsets.UTF_8.name()); } catch (Exception ignored) {}
+                            fileMap.put("name", name);
+                        } else {
+                            fileMap.put("name", "附件");
+                        }
+                        files.add(fileMap);
+                    }
+                    dto.setFiles(files);
+                }
+            } catch (Exception e) {
+                log.warn("解析fileUrls失败, questionId: {}", question.getId(), e);
+            }
+        }
         return dto;
     }
 
