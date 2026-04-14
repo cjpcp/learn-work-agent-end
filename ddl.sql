@@ -1,318 +1,273 @@
--- ============================================
--- Learn Work Agent 数据库表结构 DDL
--- 数据库: learn_work_agent
--- ============================================
+create table if not exists admin
+(
+    id         bigint auto_increment comment '主键'
+        primary key,
+    created_at datetime(6)  null,
+    login_time datetime(6)  null,
+    nick       varchar(30)  not null comment '昵称',
+    password   varchar(255) not null comment '密码',
+    role_id    bigint       not null comment '角色id',
+    status     int          not null comment '状态',
+    teacher_id bigint       not null comment '教师id',
+    updated_at datetime(6)  null,
+    username   varchar(30)  not null comment '用户名'
+);
 
-CREATE DATABASE IF NOT EXISTS learn_work_agent CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE learn_work_agent;
+create table if not exists approval_process
+(
+    id           bigint auto_increment
+        primary key,
+    create_time  datetime(6)  not null,
+    deleted      bit          not null,
+    update_time  datetime(6)  null,
+    description  varchar(500) null,
+    enabled      bit          not null,
+    name         varchar(100) not null,
+    type         varchar(20)  not null,
+    process_name varchar(100) not null,
+    process_type varchar(20)  not null,
+    version      int          not null
+);
 
--- -------------------------------------------
--- 1. 角色表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `role` (
-    `id` BIGINT NOT NULL COMMENT '主键',
-    `role_name` VARCHAR(20) NOT NULL COMMENT '角色名称',
-    `power_id` VARCHAR(255) DEFAULT NULL COMMENT '权限id',
-    `created_at` DATETIME DEFAULT NULL COMMENT '创建时间',
-    `updated_at` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `page_path` VARCHAR(255) DEFAULT NULL COMMENT '页面路径',
-    PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
+create table if not exists approval_instance
+(
+    current_step   int         null,
+    deleted        bit         not null,
+    business_id    bigint      not null,
+    completed_time datetime(6) null,
+    create_time    datetime(6) not null,
+    id             bigint auto_increment
+        primary key,
+    process_id     bigint      not null,
+    update_time    datetime(6) null,
+    business_type  varchar(20) not null,
+    status         varchar(20) not null,
+    applicant_id   bigint      null comment '申请人ID',
+    constraint FKamr5uemifnbxspk9m912hnrui
+        foreign key (process_id) references approval_process (id)
+);
 
--- -------------------------------------------
--- 2. 权限表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `power` (
-    `id` BIGINT NOT NULL COMMENT '主键',
-    `power_name` VARCHAR(255) NOT NULL COMMENT '权限名称',
-    `power_url` VARCHAR(255) NOT NULL COMMENT '权限地址',
-    `created_at` DATETIME DEFAULT NULL COMMENT '创建时间',
-    `updated_at` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `pid` INT NOT NULL COMMENT '父级id',
-    `level` INT NOT NULL COMMENT '等级',
-    PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='权限表';
+create table if not exists approval_stage
+(
+    id               bigint auto_increment
+        primary key,
+    create_time      datetime(6)  not null,
+    deleted          bit          not null,
+    update_time      datetime(6)  null,
+    approval_type    varchar(20)  not null,
+    approver_role    varchar(20)  not null,
+    approver_type    varchar(20)  null,
+    approver_user_id bigint       null,
+    department       varchar(100) null,
+    must_pass        bit          not null,
+    name             varchar(100) null,
+    order_index      int          not null,
+    step_name        varchar(100) not null,
+    step_order       int          not null,
+    process_id       bigint       not null,
+    department_id    bigint       null comment '部门ID（用于部门领导审批步骤筛选）',
+    assign_mode      varchar(20)  null comment '分配模式（USER-指定用户, ROLE-按角色池分配）',
+    role_id          varchar(50)  null comment '目标角色ID（按角色池分配时使用）',
+    constraint FKm76wvhixcyf3rh8jht1m9qvcm
+        foreign key (process_id) references approval_process (id)
+);
 
--- -------------------------------------------
--- 3. 教师表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `teacher` (
-    `id` BIGINT NOT NULL COMMENT '主键',
-    `name` VARCHAR(50) NOT NULL COMMENT '老师姓名',
-    `phone` VARCHAR(20) NOT NULL COMMENT '联系电话',
-    `card_number` VARCHAR(30) DEFAULT NULL COMMENT '学工号',
-    `state` INT NOT NULL COMMENT '状态（0：关闭 1：开启）',
-    `create_time` INT NOT NULL COMMENT '创建时间',
-    `update_time` INT NOT NULL COMMENT '更新时间',
-    PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教师表';
+create table if not exists approval_task
+(
+    id            bigint auto_increment
+        primary key,
+    create_time   datetime(6)  not null,
+    deleted       bit          not null,
+    update_time   datetime(6)  null,
+    approval_time datetime(6)  null,
+    approver_id   bigint       not null,
+    comment       varchar(500) null,
+    status        varchar(20)  not null,
+    task_order    int          null,
+    instance_id   bigint       not null,
+    step_id       bigint       not null,
+    constraint FKfbyj69061n7fqyxy5lif53cun
+        foreign key (instance_id) references approval_instance (id),
+    constraint FKqn5wkp1v0cxlydi0gb11wy5pe
+        foreign key (step_id) references approval_stage (id)
+);
 
--- -------------------------------------------
--- 4. 管理员表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `admin` (
-    `id` BIGINT NOT NULL COMMENT '主键',
-    `username` VARCHAR(30) NOT NULL COMMENT '用户名',
-    `nick` VARCHAR(30) NOT NULL COMMENT '昵称',
-    `password` VARCHAR(255) NOT NULL COMMENT '密码',
-    `role_id` BIGINT NOT NULL COMMENT '角色id',
-    `created_at` DATETIME DEFAULT NULL COMMENT '创建时间',
-    `updated_at` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `login_time` DATETIME DEFAULT NULL COMMENT '最后登录时间',
-    `status` INT NOT NULL COMMENT '状态',
-    `teacher_id` BIGINT NOT NULL COMMENT '教师id',
-    PRIMARY KEY (`id`),
-    KEY `idx_admin_role_id` (`role_id`),
-    KEY `idx_admin_teacher_id` (`teacher_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员账户表';
+create table if not exists award_application
+(
+    amount               decimal(10, 2) null,
+    deleted              bit            not null,
+    applicant_id         bigint         not null,
+    approval_time        datetime(6)    null,
+    approver_id          bigint         null,
+    create_time          datetime(6)    not null,
+    id                   bigint auto_increment
+        primary key,
+    material_review_time datetime(6)    null,
+    update_time          datetime(6)    null,
+    application_type     varchar(20)    not null,
+    approval_status      varchar(20)    not null,
+    grade                varchar(20)    null,
+    material_status      varchar(20)    not null,
+    class_name           varchar(50)    null,
+    student_name         varchar(50)    null,
+    department           varchar(100)   null,
+    award_name           varchar(200)   not null,
+    approval_comment     varchar(500)   null,
+    material_comment     varchar(500)   null,
+    attachment_urls      text           null,
+    reason               text           null,
+    department_id        bigint         null comment '院系ID',
+    department_name      varchar(100)   null comment '院系名称'
+);
 
--- -------------------------------------------
--- 5. 请假申请表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `leave_application` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `create_time` DATETIME NOT NULL COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除',
-    `applicant_id` BIGINT NOT NULL COMMENT '申请人ID',
-    `leave_type` VARCHAR(20) NOT NULL COMMENT '请假类型',
-    `start_date` DATE NOT NULL COMMENT '请假开始日期',
-    `end_date` DATE NOT NULL COMMENT '请假结束日期',
-    `days` INT NOT NULL COMMENT '请假天数',
-    `reason` TEXT COMMENT '请假原因',
-    `attachment_url` VARCHAR(500) DEFAULT NULL COMMENT '附件URL',
-    `approver_id` BIGINT DEFAULT NULL COMMENT '审批人ID',
-    `approval_status` VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '审批状态',
-    `approval_comment` VARCHAR(500) DEFAULT NULL COMMENT '审批意见',
-    `approval_time` DATETIME DEFAULT NULL COMMENT '审批时间',
-    `leave_slip_status` VARCHAR(20) DEFAULT 'NOT_GENERATED' COMMENT '请假条生成状态',
-    `leave_slip_url` VARCHAR(500) DEFAULT NULL COMMENT '请假条URL',
-    `cancelled` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已销假',
-    `cancel_time` DATETIME DEFAULT NULL COMMENT '销假时间',
-    `cancel_requested` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已申请销假',
-    `cancel_approval_status` VARCHAR(20) DEFAULT NULL COMMENT '销假审批状态',
-    `cancel_approval_comment` VARCHAR(500) DEFAULT NULL COMMENT '销假审批意见',
-    `cancel_approval_time` DATETIME DEFAULT NULL COMMENT '销假审批时间',
-    `student_name` VARCHAR(50) DEFAULT NULL COMMENT '姓名',
-    `department_name` VARCHAR(50) DEFAULT NULL COMMENT '院系名称',
-    `grade` VARCHAR(20) DEFAULT NULL COMMENT '年级',
-    `class_name` VARCHAR(50) DEFAULT NULL COMMENT '班级',
-    PRIMARY KEY (`id`),
-    KEY `idx_leave_applicant` (`applicant_id`),
-    KEY `idx_leave_approver` (`approver_id`),
-    KEY `idx_leave_status` (`approval_status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='请假申请表';
+create table if not exists consultation_question
+(
+    deleted              bit          not null,
+    satisfaction_score   int          null,
+    transferred_to_human bit          not null,
+    create_time          datetime(6)  not null,
+    id                   bigint auto_increment
+        primary key,
+    update_time          datetime(6)  null,
+    user_id              bigint       not null,
+    answer_source        varchar(20)  null,
+    question_type        varchar(20)  not null,
+    status               varchar(20)  not null,
+    category             varchar(50)  null,
+    image_url            varchar(500) null,
+    transfer_reason      varchar(500) null,
+    voice_url            varchar(500) null,
+    ai_answer            text         null,
+    question_text        text         null,
+    session_id           varchar(64)  null comment '会话ID',
+    file_urls            text         null comment '附件文件URL列表(JSON)',
+    conversation_id      varchar(64)  null comment 'Dify对话ID',
+    is_answering         bit          null comment 'AI是否正在回答中'
+);
 
--- -------------------------------------------
--- 6. 奖助申请表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `award_application` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `create_time` DATETIME NOT NULL COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除',
-    `applicant_id` BIGINT NOT NULL COMMENT '申请人ID',
-    `application_type` VARCHAR(20) NOT NULL COMMENT '申请类型（SCHOLARSHIP-奖学金, GRANT-助学金, SUBSIDY-困难补助）',
-    `award_name` VARCHAR(200) NOT NULL COMMENT '申请名称',
-    `amount` DECIMAL(10,2) DEFAULT NULL COMMENT '申请金额',
-    `reason` TEXT COMMENT '申请理由',
-    `material_status` VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '材料预审状态',
-    `material_comment` VARCHAR(500) DEFAULT NULL COMMENT '材料预审意见',
-    `material_review_time` DATETIME DEFAULT NULL COMMENT '材料预审时间',
-    `approver_id` BIGINT DEFAULT NULL COMMENT '审批人ID',
-    `approval_status` VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '审批状态',
-    `approval_comment` VARCHAR(500) DEFAULT NULL COMMENT '审批意见',
-    `approval_time` DATETIME DEFAULT NULL COMMENT '审批时间',
-    `attachment_urls` TEXT COMMENT '附件URL列表（JSON格式）',
-    `student_name` VARCHAR(50) DEFAULT NULL COMMENT '姓名',
-    `department_id` BIGINT DEFAULT NULL COMMENT '院系ID',
-    `grade` VARCHAR(20) DEFAULT NULL COMMENT '年级',
-    `class_name` VARCHAR(50) DEFAULT NULL COMMENT '班级',
-    PRIMARY KEY (`id`),
-    KEY `idx_award_applicant` (`applicant_id`),
-    KEY `idx_award_approver` (`approver_id`),
-    KEY `idx_award_status` (`approval_status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='奖助申请表';
+create table if not exists human_transfer
+(
+    deleted         bit          not null,
+    create_time     datetime(6)  not null,
+    id              bigint auto_increment
+        primary key,
+    process_time    datetime(6)  null,
+    question_id     bigint       null comment '咨询问题ID',
+    staff_id        bigint       null,
+    update_time     datetime(6)  null,
+    user_id         bigint       not null,
+    status          varchar(20)  not null,
+    transfer_type   varchar(20)  not null,
+    transfer_reason varchar(500) null,
+    staff_reply     text         null,
+    question_text   text         null comment '用户填写的转接问题描述',
+    question_type   varchar(50)  null comment '问题类型',
+    file_urls       text         null comment '附件URL列表'
+);
 
--- -------------------------------------------
--- 7. 审批流程表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `approval_process` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `create_time` DATETIME NOT NULL COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除',
-    `process_name` VARCHAR(100) NOT NULL COMMENT '流程名称',
-    `process_type` VARCHAR(20) NOT NULL COMMENT '流程类型（LEAVE-请假, AWARD-奖助）',
-    `description` VARCHAR(500) DEFAULT NULL COMMENT '描述',
-    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
-    `version` INT NOT NULL DEFAULT 1 COMMENT '版本号',
-    PRIMARY KEY (`id`),
-    KEY `idx_process_type` (`process_type`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审批流程表';
+create table if not exists human_transfer_config
+(
+    id            bigint auto_increment
+        primary key,
+    create_time   datetime(6)   not null,
+    deleted       bit           not null,
+    update_time   datetime(6)   null,
+    assign_mode   varchar(20)   not null comment '分配模式：USER/ROLE',
+    business_type varchar(50)   not null comment '业务分类',
+    enabled       bit           not null comment '是否启用',
+    priority      int           not null comment '优先级',
+    remark        varchar(500)  null comment '备注',
+    role_id       bigint        null comment '目标角色ID',
+    user_id       bigint        null comment '目标用户ID',
+    user_ids      varchar(1000) null comment '目标用户ID列表，逗号分隔'
+)
+    comment '人工转接配置表';
 
--- -------------------------------------------
--- 8. 审批步骤表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `approval_stage` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `create_time` DATETIME NOT NULL COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除',
-    `process_id` BIGINT NOT NULL COMMENT '流程ID',
-    `step_name` VARCHAR(100) NOT NULL COMMENT '步骤名称',
-    `step_order` INT NOT NULL COMMENT '步骤顺序',
-    `approval_type` VARCHAR(20) NOT NULL DEFAULT 'SINGLE' COMMENT '审批类型（SINGLE-单人审批, MULTIPLE-多人审批）',
-    `approver_role` VARCHAR(20) NOT NULL COMMENT '审批人角色（COUNSELOR-辅导员, COLLEGE_LEADER-院领导, DEPARTMENT_LEADER-部门领导）',
-    `must_pass` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否必须通过',
-    `approver_user_id` BIGINT DEFAULT NULL COMMENT '具体审批人ID',
-    `assign_mode` VARCHAR(20) DEFAULT 'USER' COMMENT '分配模式（USER-指定用户, ROLE-按角色池分配）',
-    `role_id` VARCHAR(50) DEFAULT NULL COMMENT '目标角色ID',
-    PRIMARY KEY (`id`),
-    KEY `idx_stage_process` (`process_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审批步骤表';
+create table if not exists leave_application
+(
+    cancelled               bit          not null,
+    days                    int          not null,
+    deleted                 bit          not null,
+    end_date                date         not null,
+    start_date              date         not null,
+    applicant_id            bigint       not null,
+    approval_time           datetime(6)  null,
+    approver_id             bigint       null,
+    cancel_time             datetime(6)  null,
+    create_time             datetime(6)  not null,
+    id                      bigint auto_increment
+        primary key,
+    update_time             datetime(6)  null,
+    approval_status         varchar(20)  not null,
+    grade                   varchar(20)  null,
+    leave_slip_status       varchar(20)  null,
+    leave_type              varchar(20)  not null,
+    class_name              varchar(50)  null,
+    student_name            varchar(50)  null,
+    department              varchar(100) null,
+    approval_comment        varchar(500) null,
+    attachment_url          varchar(500) null,
+    leave_slip_url          varchar(500) null,
+    reason                  text         null,
+    department_code         varchar(50)  null comment '院系代码',
+    department_id           varchar(50)  null comment '院系名称',
+    cancel_approval_comment varchar(500) null comment '销假审批意见',
+    cancel_approval_status  varchar(20)  null comment '销假审批状态',
+    cancel_approval_time    datetime(6)  null comment '销假审批时间',
+    cancel_requested        bit          not null comment '是否已申请销假'
+);
 
--- -------------------------------------------
--- 9. 审批实例表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `approval_instance` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `create_time` DATETIME NOT NULL COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除',
-    `business_type` VARCHAR(20) NOT NULL COMMENT '业务类型（LEAVE-请假, AWARD-奖助）',
-    `business_id` BIGINT NOT NULL COMMENT '业务ID',
-    `applicant_id` BIGINT DEFAULT NULL COMMENT '申请人ID',
-    `process_id` BIGINT NOT NULL COMMENT '流程ID',
-    `current_step` INT DEFAULT NULL COMMENT '当前步骤',
-    `status` VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '整体状态',
-    `completed_time` DATETIME DEFAULT NULL COMMENT '完成时间',
-    PRIMARY KEY (`id`),
-    KEY `idx_instance_business` (`business_type`, `business_id`),
-    KEY `idx_instance_applicant` (`applicant_id`),
-    KEY `idx_instance_process` (`process_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审批实例表';
+create table if not exists notification
+(
+    deleted        bit          not null,
+    is_read        bit          not null,
+    business_id    bigint       null,
+    create_time    datetime(6)  not null,
+    id             bigint auto_increment
+        primary key,
+    read_time      datetime(6)  null,
+    update_time    datetime(6)  null,
+    user_id        bigint       not null,
+    channel        varchar(20)  null,
+    business_type  varchar(50)  null,
+    type           varchar(50)  not null,
+    title          varchar(200) not null,
+    channel_status varchar(500) null,
+    content        text         null
+);
 
--- -------------------------------------------
--- 10. 审批任务表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `approval_task` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `create_time` DATETIME NOT NULL COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除',
-    `instance_id` BIGINT NOT NULL COMMENT '审批实例ID',
-    `step_id` BIGINT NOT NULL COMMENT '审批步骤ID',
-    `approver_id` BIGINT NOT NULL COMMENT '审批人ID',
-    `status` VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '审批状态',
-    `comment` VARCHAR(500) DEFAULT NULL COMMENT '审批意见',
-    `approval_time` DATETIME DEFAULT NULL COMMENT '审批时间',
-    `task_order` INT DEFAULT NULL COMMENT '任务顺序',
-    PRIMARY KEY (`id`),
-    KEY `idx_task_instance` (`instance_id`),
-    KEY `idx_task_step` (`step_id`),
-    KEY `idx_task_approver` (`approver_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审批任务表';
+create table if not exists power
+(
+    id         bigint       not null comment '主键'
+        primary key,
+    created_at datetime(6)  null,
+    level      int          not null comment '等级',
+    pid        int          not null comment '父级id',
+    power_name varchar(255) not null comment '权限名称',
+    power_url  varchar(255) not null comment '权限地址',
+    updated_at datetime(6)  null
+);
 
--- -------------------------------------------
--- 11. 咨询问题表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `consultation_question` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `create_time` DATETIME NOT NULL COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除',
-    `user_id` BIGINT NOT NULL COMMENT '用户ID',
-    `question_text` TEXT COMMENT '问题内容',
-    `question_type` VARCHAR(20) NOT NULL COMMENT '问题类型（TEXT-文本, VOICE-语音, IMAGE-图片）',
-    `category` VARCHAR(50) DEFAULT NULL COMMENT '问题分类',
-    `voice_url` VARCHAR(500) DEFAULT NULL COMMENT '语音URL',
-    `ai_answer` TEXT COMMENT 'AI回答内容',
-    `answer_source` VARCHAR(20) DEFAULT NULL COMMENT '回答来源（AI-智能回答, HUMAN-人工回答）',
-    `transferred_to_human` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已转人工',
-    `transfer_reason` VARCHAR(500) DEFAULT NULL COMMENT '转人工原因',
-    `status` VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '状态',
-    `satisfaction_score` INT DEFAULT NULL COMMENT '满意度评分（1-5）',
-    `session_id` VARCHAR(64) DEFAULT NULL COMMENT '会话ID',
-    PRIMARY KEY (`id`),
-    KEY `idx_consult_user` (`user_id`),
-    KEY `idx_consult_session` (`session_id`),
-    KEY `idx_consult_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='咨询问题表';
+create table if not exists role
+(
+    id         bigint       not null comment '主键'
+        primary key,
+    created_at datetime(6)  null,
+    page_path  varchar(255) null,
+    power_id   varchar(255) null comment '权限id',
+    role_name  varchar(20)  not null comment '角色名称',
+    updated_at datetime(6)  null
+);
 
--- -------------------------------------------
--- 12. 人工转接配置表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `human_transfer_config` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `create_time` DATETIME NOT NULL COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除',
-    `business_type` VARCHAR(50) NOT NULL COMMENT '业务分类',
-    `assign_mode` VARCHAR(20) NOT NULL COMMENT '分配模式：USER/ROLE',
-    `role_id` BIGINT DEFAULT NULL COMMENT '目标角色ID',
-    `user_ids` VARCHAR(1000) DEFAULT NULL COMMENT '目标用户ID列表，逗号分隔',
-    `priority` INT NOT NULL DEFAULT 1 COMMENT '优先级',
-    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
-    `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
-    PRIMARY KEY (`id`),
-    KEY `idx_config_business` (`business_type`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='人工转接配置表';
+create table if not exists teacher
+(
+    id          bigint auto_increment comment '主键'
+        primary key,
+    card_number varchar(30) null comment '学工号',
+    create_time int         not null comment '创建时间',
+    name        varchar(50) not null comment '老师姓名',
+    phone       varchar(20) not null comment '联系电话',
+    state       int         not null comment '状态（0：关闭 1：开启）',
+    update_time int         not null comment '更新时间'
+);
 
--- -------------------------------------------
--- 13. 人工转接记录表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `human_transfer` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `create_time` DATETIME NOT NULL COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除',
-    `question_id` BIGINT NOT NULL COMMENT '咨询问题ID',
-    `user_id` BIGINT NOT NULL COMMENT '用户ID',
-    `staff_id` BIGINT DEFAULT NULL COMMENT '工作人员ID',
-    `transfer_reason` VARCHAR(500) DEFAULT NULL COMMENT '转接原因',
-    `transfer_type` VARCHAR(20) NOT NULL COMMENT '转接方式（AUTO-自动识别, MANUAL-用户主动申请）',
-    `status` VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '状态',
-    `staff_reply` TEXT COMMENT '工作人员回复内容',
-    `process_time` DATETIME DEFAULT NULL COMMENT '处理时间',
-    PRIMARY KEY (`id`),
-    KEY `idx_transfer_question` (`question_id`),
-    KEY `idx_transfer_staff` (`staff_id`),
-    KEY `idx_transfer_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='人工转接记录表';
-
--- -------------------------------------------
--- 14. 通知表
--- -------------------------------------------
-CREATE TABLE IF NOT EXISTS `notification` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `create_time` DATETIME NOT NULL COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT NULL COMMENT '更新时间',
-    `deleted` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除',
-    `user_id` BIGINT NOT NULL COMMENT '接收用户ID',
-    `type` VARCHAR(50) NOT NULL COMMENT '通知类型',
-    `title` VARCHAR(200) NOT NULL COMMENT '通知标题',
-    `content` TEXT COMMENT '通知内容',
-    `is_read` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已读',
-    `read_time` DATETIME DEFAULT NULL COMMENT '读取时间',
-    `business_id` BIGINT DEFAULT NULL COMMENT '关联业务ID',
-    `business_type` VARCHAR(50) DEFAULT NULL COMMENT '关联业务类型',
-    `channel` VARCHAR(20) DEFAULT NULL COMMENT '推送渠道',
-    `channel_status` VARCHAR(500) DEFAULT NULL COMMENT '各渠道发送状态',
-    PRIMARY KEY (`id`),
-    KEY `idx_notification_user` (`user_id`),
-    KEY `idx_notification_read` (`is_read`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知表';
-
--- -------------------------------------------
--- 外键约束
--- -------------------------------------------
-ALTER TABLE `admin` ADD CONSTRAINT `fk_admin_role` FOREIGN KEY (`role_id`) REFERENCES `role`(`id`);
-ALTER TABLE `admin` ADD CONSTRAINT `fk_admin_teacher` FOREIGN KEY (`teacher_id`) REFERENCES `teacher`(`id`);
-
-ALTER TABLE `approval_stage` ADD CONSTRAINT `fk_stage_process` FOREIGN KEY (`process_id`) REFERENCES `approval_process`(`id`);
-
-ALTER TABLE `approval_instance` ADD CONSTRAINT `fk_instance_process` FOREIGN KEY (`process_id`) REFERENCES `approval_process`(`id`);
-
-ALTER TABLE `approval_task` ADD CONSTRAINT `fk_task_instance` FOREIGN KEY (`instance_id`) REFERENCES `approval_instance`(`id`);
-ALTER TABLE `approval_task` ADD CONSTRAINT `fk_task_step` FOREIGN KEY (`step_id`) REFERENCES `approval_stage`(`id`);

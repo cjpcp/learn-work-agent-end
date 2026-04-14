@@ -432,6 +432,9 @@ public class ConsultationController extends BaseController {
     @Operation(summary = "获取转人工记录详情")
     @GetMapping("/transfers/{id}")
     public Result<Map<String, Object>> getTransferDetail(@PathVariable Long id) {
+        if (id == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "转接记录ID不能为空");
+        }
         HumanTransfer transfer = humanTransferRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "转人工记录不存在"));
 
@@ -459,6 +462,9 @@ public class ConsultationController extends BaseController {
     @Operation(summary = "分配工作人员")
     @PostMapping("/transfers/{id}/assign")
     public Result<Void> assignStaff(@PathVariable Long id, @RequestParam Long staffId) {
+        if (id == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "转接记录ID不能为空");
+        }
         humanTransferService.assignStaff(id, staffId);
         return Result.success();
     }
@@ -466,6 +472,9 @@ public class ConsultationController extends BaseController {
     @Operation(summary = "工作人员回复")
     @PostMapping("/transfers/{id}/reply")
     public Result<Void> reply(@PathVariable Long id, @RequestParam String reply) {
+        if (id == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "转接记录ID不能为空");
+        }
         Long staffId = getCurrentUserId();
         humanTransferService.reply(id, staffId, reply);
         return Result.success();
@@ -474,6 +483,9 @@ public class ConsultationController extends BaseController {
     @Operation(summary = "直接处理转接记录")
     @PostMapping("/transfers/{id}/process")
     public Result<Void> process(@PathVariable Long id, @RequestParam String reply) {
+        if (id == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "转接记录ID不能为空");
+        }
         Long staffId = getCurrentUserId();
         humanTransferService.process(id, staffId, reply);
         return Result.success();
