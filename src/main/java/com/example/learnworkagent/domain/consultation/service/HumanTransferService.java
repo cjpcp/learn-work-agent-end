@@ -38,28 +38,46 @@ public class HumanTransferService {
      * 创建转接记录并更新问题为转接状态
      */
     @Transactional
-    public void createTransfer(Long questionId, Long userId, String transferType, String reason) {
-        ConsultationQuestion question = consultationQuestionRepository.findById(questionId)
-                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "咨询问题不存在"));
-
+    public void createTransfer(Long questionId, Long userId, String transferType, String reason,
+                               String questionType, String questionText) {
         HumanTransfer transfer = new HumanTransfer();
         transfer.setQuestionId(questionId);
         transfer.setUserId(userId);
         transfer.setTransferType(transferType);
         transfer.setTransferReason(reason);
+        transfer.setQuestionType(questionType);
+        transfer.setQuestionText(questionText);
 
-        Long matchedStaffId = humanTransferConfigService.resolveStaffId(question.getCategory());
-        if (matchedStaffId != null) {
-            transfer.setStaffId(matchedStaffId);
-            transfer.setStatus("PROCESSING");
+        if (questionId != null) {
+            ConsultationQuestion question = consultationQuestionRepository.findById(questionId)
+                    .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "咨询问题不存在"));
+
+            if (Boolean.TRUE.equals(question.getIsAnswering())) {
+                throw new BusinessException(ResultCode.FORBIDDEN, "AI正在回答中，请等待回答完成后，再申请转人工");
+            }
+
+            String categoryForResolve = question.getCategory() != null ? question.getCategory() : questionType;
+            Long matchedStaffId = humanTransferConfigService.resolveStaffId(categoryForResolve);
+            if (matchedStaffId != null) {
+                transfer.setStaffId(matchedStaffId);
+                transfer.setStatus("PROCESSING");
+            } else {
+                transfer.setStatus("PENDING");
+            }
+
+            question.setTransferredToHuman(true);
+            question.setStatus("TRANSFERRED");
+            question.setTransferReason(reason);
+            consultationQuestionRepository.save(question);
         } else {
-            transfer.setStatus("PENDING");
+            Long matchedStaffId = humanTransferConfigService.resolveStaffId(questionType);
+            if (matchedStaffId != null) {
+                transfer.setStaffId(matchedStaffId);
+                transfer.setStatus("PROCESSING");
+            } else {
+                transfer.setStatus("PENDING");
+            }
         }
-
-        question.setTransferredToHuman(true);
-        question.setStatus("TRANSFERRED");
-        question.setTransferReason(reason);
-        consultationQuestionRepository.save(question);
 
         humanTransferRepository.save(transfer);
     }

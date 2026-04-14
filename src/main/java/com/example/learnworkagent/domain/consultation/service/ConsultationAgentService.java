@@ -75,43 +75,52 @@ public class ConsultationAgentService {
     @Async
     public void processQuestionAsync(Long questionId) {
         try {
-            //获取问题，如果问题不存在，则抛出异常
             ConsultationQuestion question = consultationQuestionRepository.findById(questionId)
                     .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "问题不存在"));
             log.info("开始处理问题，问题ID: {}", questionId);
-            log.info("开始处理问题，问题内容: {}", question);
 
-            // 尝试从缓存获取答案
             String cachedAnswer = getCachedAnswer(question);
             if (cachedAnswer != null) {
                 self.updateQuestionAnswer(question, cachedAnswer, "AI");
                 return;
             }
 
-            // 动态构造 query（整合语音转文字），再调用原有的 Dify 智能咨询服务
             List<String> fileUrls = resolveFileUrls(question);
             String query = buildQuery(question);
             String prompt = buildPrompt(question, query);
-            log.info("调用Dify  AI，问题ID: {}, 文件数: {}", questionId,
+            log.info("调用Dify AI，问题ID: {}, 文件数: {}", questionId,
                     fileUrls != null ? fileUrls.size() : 0);
+
+            question.setStatus("ANSWERING");
+            question.setIsAnswering(true);
+            consultationQuestionRepository.save(question);
+
+            StringBuilder partialAnswer = new StringBuilder();
             difyChatService.chatStream(prompt, fileUrls, null, String.valueOf(question.getUserId()),
                     convId -> {
                         log.info("捕获到conversation_id: {}，保存到问题: {}", convId, questionId);
                         question.setConversationId(convId);
                         consultationQuestionRepository.save(question);
                     })
+                    .doOnNext(partial -> {
+                        partialAnswer.append(partial);
+                    })
                     .collectList()
                     .subscribe(
                             answerList -> {
                                 String answer = String.join("", answerList);
-                                // 缓存答案
                                 cacheAnswer(question, answer);
-                                // 更新问题答案
                                 self.updateQuestionAnswer(question, answer, "AI");
+                                question.setIsAnswering(false);
+                                consultationQuestionRepository.save(question);
                             },
                             error -> {
                                 log.error("AI服务调用失败，问题ID: {}", questionId, error);
-                                // AI服务失败，转人工
+                                if (partialAnswer.length() > 0) {
+                                    question.setAiAnswer(partialAnswer.toString());
+                                }
+                                question.setIsAnswering(false);
+                                consultationQuestionRepository.save(question);
                                 self.transferToHuman(question);
                             }
                     );
@@ -244,6 +253,7 @@ public class ConsultationAgentService {
         question.setAiAnswer(answer);
         question.setAnswerSource(source);
         question.setStatus("ANSWERED");
+        question.setIsAnswering(false);
         consultationQuestionRepository.save(question);
     }
 
@@ -257,18 +267,15 @@ public class ConsultationAgentService {
     public Flux<String> processQuestionStream(Long questionId) {
         log.info("开始流式处理问题，问题ID: {}", questionId);
 
-        // 将阻塞的数据库查询包装在异步操作中
         return Mono.fromCallable(() -> consultationQuestionRepository.findById(questionId)
                         .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "问题不存在")))
-                .subscribeOn(Schedulers.boundedElastic())  // 使用专门的阻塞线程池
+                .subscribeOn(Schedulers.boundedElastic())
                 .flatMapMany(question -> {
 
-                    //检查缓存中是否有答案或需要更新答案
                     String cachedAnswer = getCachedAnswer(question);
                     if (cachedAnswer != null) {
                         log.info("使用缓存答案，问题ID: {}", questionId);
 
-                        //使用专门的线程池来处理阻塞任务
                         Mono.fromRunnable(() -> self.updateQuestionAnswer(question, cachedAnswer, "AI"))
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .doOnError(error -> log.error("更新缓存答案失败，问题ID: {}", questionId, error))
@@ -277,12 +284,17 @@ public class ConsultationAgentService {
                         return Flux.just(cachedAnswer);
                     }
 
-                    // 动态构造 query（整合语音转文字），再调用原有的 Dify 智能咨询服务
                     List<String> fileUrls = resolveFileUrls(question);
                     String query = buildQuery(question);
                     String prompt = buildPrompt(question, query);
                     log.info("调用Dify AI，问题ID: {}, 文件数: {}", questionId,
                             fileUrls != null ? fileUrls.size() : 0);
+
+                    question.setStatus("ANSWERING");
+                    question.setIsAnswering(true);
+                    consultationQuestionRepository.save(question);
+
+                    StringBuilder partialAnswer = new StringBuilder();
 
                     return difyChatService.chatStream(prompt, fileUrls, null,
                                     String.valueOf(question.getUserId()),
@@ -291,22 +303,32 @@ public class ConsultationAgentService {
                                         question.setConversationId(convId);
                                         consultationQuestionRepository.save(question);
                                     })
-                            //所有数据发送完成时的回调函数
+                            .doOnNext(partial -> {
+                                partialAnswer.append(partial);
+                            })
                             .doOnComplete(() -> {
                                 log.info("Dify API调用完成，问题ID: {}", questionId);
                                 Mono.fromRunnable(() -> {
+                                            question.setAiAnswer(partialAnswer.toString());
                                             question.setStatus("ANSWERED");
                                             question.setAnswerSource("AI");
+                                            question.setIsAnswering(false);
                                             consultationQuestionRepository.save(question);
                                         })
                                         .subscribeOn(Schedulers.boundedElastic())
                                         .doOnError(error -> log.error("保存AI回答失败，问题ID: {}", questionId, error))
                                         .subscribe();
                             })
-                            //当发送过程中发生错误时的回调函数
                             .doOnError(error -> {
                                 log.error("AI服务调用失败，问题ID: {}", questionId, error);
-                                Mono.fromRunnable(() -> self.transferToHuman(question))
+                                Mono.fromRunnable(() -> {
+                                            if (partialAnswer.length() > 0) {
+                                                question.setAiAnswer(partialAnswer.toString());
+                                            }
+                                            question.setIsAnswering(false);
+                                            consultationQuestionRepository.save(question);
+                                            self.transferToHuman(question);
+                                        })
                                         .subscribeOn(Schedulers.boundedElastic())
                                         .doOnError(transferError -> log.error("转人工处理失败，问题ID: {}", questionId, transferError))
                                         .subscribe();

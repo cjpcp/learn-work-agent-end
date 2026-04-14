@@ -20,11 +20,25 @@ import lombok.EqualsAndHashCode;
 public class HumanTransfer extends BaseEntity {
 
     /**
-     * 咨询问题ID
+     * 咨询问题ID（可能为空，当用户直接转人工时）
      */
     @Comment("咨询问题ID")
-    @Column(name = "question_id", nullable = false)
+    @Column(name = "question_id")
     private Long questionId;
+
+    /**
+     * 问题类型
+     */
+    @Comment("问题类型")
+    @Column(name = "question_type", length = 50)
+    private String questionType;
+
+    /**
+     * 用户填写的转接问题描述
+     */
+    @Comment("用户填写的转接问题描述")
+    @Column(name = "question_text", columnDefinition = "TEXT")
+    private String questionText;
 
     /**
      * 用户ID

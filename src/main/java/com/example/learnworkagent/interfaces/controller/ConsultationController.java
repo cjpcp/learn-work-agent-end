@@ -31,6 +31,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -130,7 +131,17 @@ public class ConsultationController extends BaseController {
     @PostMapping("/questions/{id}/transfer")
     public Result<Void> transferToHuman(@PathVariable Long id, @RequestBody TransferToHumanRequest request) {
         Long userId = getCurrentUserId();
-        humanTransferService.createTransfer(id, userId, "MANUAL", request.getReason());
+        humanTransferService.createTransfer(id, userId, "MANUAL", request.getReason(),
+                request.getQuestionType(), request.getQuestionText());
+        return Result.success();
+    }
+
+    @Operation(summary = "直接申请转人工（无关联问题）")
+    @PostMapping("/transfer")
+    public Result<Void> directTransferToHuman(@RequestBody TransferToHumanRequest request) {
+        Long userId = getCurrentUserId();
+        humanTransferService.createTransfer(null, userId, "MANUAL", request.getReason(),
+                request.getQuestionType(), request.getQuestionText());
         return Result.success();
     }
 
@@ -199,11 +210,11 @@ public class ConsultationController extends BaseController {
                 error -> {
                     log.error("SSE流处理错误，userId: {}", userId, error);
                     try {
-                        emitter.send(SseEmitter.event().data("错误: " + error.getMessage()));
+                        emitter.send(SseEmitter.event().data("{\"error\": \"" + error.getMessage() + "\"}"));
                     } catch (IOException e) {
                         log.error("发送错误消息失败", e);
                     }
-                    emitter.completeWithError(error);
+                    emitter.complete();
                 },
                 () -> {
                     log.info("SSE流处理完成，userId: {}", userId);
@@ -332,50 +343,56 @@ public class ConsultationController extends BaseController {
         SseEmitter emitter = new SseEmitter(120000L);
 
         emitter.onCompletion(() -> log.info("multipart SSE 完成, userId: {}", userId));
-
         emitter.onError(e -> log.error("multipart SSE 错误, userId: {}", userId, e));
-
         emitter.onTimeout(() -> {
             log.warn("multipart SSE 超时, userId: {}", userId);
             emitter.complete();
         });
 
+        String finalUploadedVoiceUrl = uploadedVoiceUrl;
+        consultationService.createQuestion(userId, questionText, "TEXT", null, uploadedVoiceUrl, sessionId,
+                fileInputs.isEmpty() ? null : fileInputs)
+                .flatMapMany(saved -> {
+                    final List<ConsultationRequest.FileInput> fileInputList = new java.util.ArrayList<>(fileInputs);
+                    try {
+                        Map<String, Object> initMessage = new HashMap<>();
+                        initMessage.put("questionId", saved.getId());
+                        initMessage.put("messageType", "init");
+                        emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(initMessage)));
+                    } catch (IOException e) {
+                        log.error("发送初始化消息失败", e);
+                    }
 
-        Flux<String> responseFlux = consultationService.submitQuestionStream(
+                    Map<String, Object> userMessage = new HashMap<>();
+                    userMessage.put("questionText", questionText);
+                    List<Map<String, Object>> fileMaps = new java.util.ArrayList<>();
+                    for (ConsultationRequest.FileInput fi : fileInputList) {
+                        Map<String, Object> fm = new HashMap<>();
+                        fm.put("url", fi.getUrl());
+                        fm.put("type", fi.getType());
+                        String fileName = extractFileNameFromUrl(fi.getUrl());
+                        fm.put("name", fileName != null ? fileName : "附件");
+                        fileMaps.add(fm);
+                    }
+                    if (finalUploadedVoiceUrl != null && !finalUploadedVoiceUrl.isBlank()) {
+                        Map<String, Object> voiceFile = new HashMap<>();
+                        voiceFile.put("url", finalUploadedVoiceUrl);
+                        voiceFile.put("type", "audio");
+                        voiceFile.put("name", "语音");
+                        fileMaps.add(voiceFile);
+                    }
+                    userMessage.put("files", fileMaps.isEmpty() ? null : fileMaps);
+                    userMessage.put("messageType", "user");
+                    try {
+                        emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(userMessage)));
+                    } catch (IOException e) {
+                        log.error("发送用户消息SSE失败", e);
+                    }
 
-                userId, questionText, "TEXT", null, uploadedVoiceUrl, sessionId,
-
-                fileInputs.isEmpty() ? null : fileInputs);
-
-        try {
-            Map<String, Object> userMessage = new HashMap<>();
-            userMessage.put("questionText", questionText);
-            List<Map<String, Object>> fileMaps = new java.util.ArrayList<>();
-            if (fileInputs != null) {
-                for (ConsultationRequest.FileInput fi : fileInputs) {
-                    Map<String, Object> fm = new HashMap<>();
-                    fm.put("url", fi.getUrl());
-                    fm.put("type", fi.getType());
-                    String fileName = extractFileNameFromUrl(fi.getUrl());
-                    fm.put("name", fileName != null ? fileName : "附件");
-                    fileMaps.add(fm);
-                }
-            }
-            if (uploadedVoiceUrl != null && !uploadedVoiceUrl.isBlank()) {
-                Map<String, Object> voiceFile = new HashMap<>();
-                voiceFile.put("url", uploadedVoiceUrl);
-                voiceFile.put("type", "audio");
-                voiceFile.put("name", "语音");
-                fileMaps.add(voiceFile);
-            }
-            userMessage.put("files", fileMaps.isEmpty() ? null : fileMaps);
-            userMessage.put("messageType", "user");
-            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(userMessage)));
-        } catch (IOException e) {
-            log.error("发送用户消息SSE失败", e);
-        }
-
-        responseFlux.publishOn(Schedulers.boundedElastic()).subscribe(
+                    return consultationService.processQuestionStreamById(saved.getId());
+                })
+                .publishOn(Schedulers.boundedElastic())
+                .subscribe(
                 chunk -> {
                     try {
                         Map<String, String> data = new HashMap<>();
@@ -386,14 +403,18 @@ public class ConsultationController extends BaseController {
                     }
                 },
                 error -> {
+                    log.error("SSE流处理错误，userId: {}", userId, error);
                     try {
-                        emitter.send(SseEmitter.event().data("错误: " + error.getMessage()));
+                        emitter.send(SseEmitter.event().data("{\"error\": \"" + error.getMessage() + "\"}"));
                     } catch (IOException e) {
-                        log.error("", e);
+                        log.error("发送错误消息失败", e);
                     }
-                    emitter.completeWithError(error);
+                    emitter.complete();
                 },
-                emitter::complete
+                () -> {
+                    log.info("SSE流处理完成，userId: {}", userId);
+                    emitter.complete();
+                }
         );
 
         return emitter;
@@ -412,11 +433,25 @@ public class ConsultationController extends BaseController {
     public Result<Map<String, Object>> getTransferDetail(@PathVariable Long id) {
         HumanTransfer transfer = humanTransferRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "转人工记录不存在"));
-        List<ConsultationQuestion> history = consultationService.getHistoryByUserIdUpToQuestion(
-                transfer.getUserId(), transfer.getQuestionId());
+
+        List<Map<String, Object>> historyWithFiles = new java.util.ArrayList<>();
+        if (transfer.getQuestionId() != null) {
+            List<ConsultationQuestion> history = consultationService.getHistoryByUserIdUpToQuestion(
+                    transfer.getUserId(), transfer.getQuestionId());
+            historyWithFiles = history.stream().map(q -> {
+                Map<String, Object> map = new java.util.HashMap<>();
+                map.put("id", q.getId());
+                map.put("questionText", q.getQuestionText());
+                map.put("answer", q.getAiAnswer());
+                map.put("createTime", q.getCreateTime());
+                map.put("files", consultationService.parseFileUrls(q.getFileUrls()));
+                return map;
+            }).toList();
+        }
+
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("transfer", transfer);
-        result.put("history", history);
+        result.put("history", historyWithFiles);
         return Result.success(result);
     }
 
@@ -484,7 +519,7 @@ public class ConsultationController extends BaseController {
                 name = name.substring(0, questionIdx);
             }
             try {
-                name = java.net.URLDecoder.decode(name, java.nio.charset.StandardCharsets.UTF_8.name());
+                name = java.net.URLDecoder.decode(name, StandardCharsets.UTF_8);
             } catch (Exception ignored) {
             }
             return name;

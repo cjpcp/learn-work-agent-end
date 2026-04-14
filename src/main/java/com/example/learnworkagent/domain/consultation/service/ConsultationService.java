@@ -10,6 +10,7 @@ import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestio
 import com.example.learnworkagent.domain.consultation.repository.ConsultationQuestionRepository;
 import com.example.learnworkagent.infrastructure.external.dify.DifyChatService;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -121,9 +124,15 @@ public class ConsultationService {
      * @return 咨询问题历史列表
      */
     public List<ConsultationQuestion> getHistoryByUserIdUpToQuestion(Long userId, Long questionId) {
+        if (questionId == null) {
+            return new java.util.ArrayList<>();
+        }
         ConsultationQuestion question = consultationQuestionRepository.findById(questionId).orElse(null);
         if (question != null && question.getSessionId() != null && !question.getSessionId().isBlank()) {
-            return consultationQuestionRepository.findBySessionIdOrderByCreateTimeAsc(question.getSessionId());
+            List<ConsultationQuestion> sessionQuestions = consultationQuestionRepository.findBySessionIdOrderByCreateTimeAsc(question.getSessionId());
+            return sessionQuestions.stream()
+                    .filter(q -> q.getId() <= questionId)
+                    .toList();
         }
         return consultationQuestionRepository.findHistoryByUserIdUpToQuestion(userId, questionId);
     }
@@ -228,9 +237,9 @@ public class ConsultationService {
      * @param files       附件列表（可选）
      * @return AI回答内容的流
      */
-    public Flux<String> submitQuestionStream(Long userId, String questionText, String questionType,
-                                             String category, String voiceUrl, String sessionId,
-                                             List<ConsultationRequest.FileInput> files) {
+    public Mono<ConsultationQuestion> createQuestion(Long userId, String questionText, String questionType,
+                                              String category, String voiceUrl, String sessionId,
+                                              List<ConsultationRequest.FileInput> files) {
         ConsultationQuestion question = new ConsultationQuestion();
         question.setUserId(userId);
         question.setQuestionText(questionText);
@@ -241,11 +250,23 @@ public class ConsultationService {
         question.setStatus("PENDING");
         question.setFileUrls(serializeFileUrls(files));
 
-        ConsultationQuestion saved = consultationQuestionRepository.save(question);
+        return Mono.fromCallable(() -> consultationQuestionRepository.save(question))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
 
-        Flux<String> res = consultationAgentService.processQuestionStream(saved.getId());
-        log.info("res1:{}", res);
-        return res;
+    public Flux<String> submitQuestionStream(Long userId, String questionText, String questionType,
+                                             String category, String voiceUrl, String sessionId,
+                                             List<ConsultationRequest.FileInput> files) {
+        return createQuestion(userId, questionText, questionType, category, voiceUrl, sessionId, files)
+                .flatMapMany(saved -> {
+                    Flux<String> res = consultationAgentService.processQuestionStream(saved.getId());
+                    log.info("res1:{}", res);
+                    return res;
+                });
+    }
+
+    public Flux<String> processQuestionStreamById(Long questionId) {
+        return consultationAgentService.processQuestionStream(questionId);
     }
 
     /**
@@ -266,5 +287,44 @@ public class ConsultationService {
             log.warn("序列化文件URL失败", e);
             return null;
         }
+    }
+
+    public List<Map<String, Object>> parseFileUrls(String fileUrlsJson) {
+        if (fileUrlsJson == null || fileUrlsJson.isBlank()) return new java.util.ArrayList<>();
+        try {
+            List<String> urls = objectMapper.readValue(fileUrlsJson, new TypeReference<List<String>>() {});
+            return urls.stream().map(url -> {
+                Map<String, Object> fileMap = new java.util.HashMap<>();
+                fileMap.put("url", url);
+                String fileName = extractFileNameFromUrl(url);
+                fileMap.put("name", fileName != null ? fileName : "附件");
+                String lower = url.toLowerCase();
+                if (lower.matches(".*\\.(jpg|jpeg|png|gif|webp|bmp)$")) {
+                    fileMap.put("type", "image");
+                } else if (lower.matches(".*\\.(mp3|wav|ogg|m4a)$")) {
+                    fileMap.put("type", "audio");
+                } else {
+                    fileMap.put("type", "document");
+                }
+                return fileMap;
+            }).toList();
+        } catch (JsonProcessingException e) {
+            log.warn("解析文件URL失败", e);
+            return new java.util.ArrayList<>();
+        }
+    }
+
+    private String extractFileNameFromUrl(String url) {
+        if (url == null || url.isBlank()) return null;
+        int lastSlash = url.lastIndexOf('/');
+        if (lastSlash >= 0 && lastSlash < url.length() - 1) {
+            String filename = url.substring(lastSlash + 1);
+            int queryIndex = filename.indexOf('?');
+            if (queryIndex > 0) {
+                filename = filename.substring(0, queryIndex);
+            }
+            return filename;
+        }
+        return null;
     }
 }

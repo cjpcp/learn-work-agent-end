@@ -83,11 +83,18 @@ public class ConsultationQuestion extends BaseEntity {
     private String transferReason;
 
     /**
-     * 状态（PENDING-待回�? ANSWERED-已回�? TRANSFERRED-已转人工�?
+     * 状态（PENDING-待回复, ANSWERING-AI正在回答, ANSWERED-已回复, TRANSFERRED-已转人工）
      */
     @Comment("状态")
     @Column(name = "status", nullable = false, length = 20)
     private String status = "PENDING";
+
+    /**
+     * AI是否正在回答中（用于限制转人工时机）
+     */
+    @Comment("AI是否正在回答中")
+    @Column(name = "is_answering")
+    private Boolean isAnswering = false;
 
     /**
      * 满意度评分（1-5�?

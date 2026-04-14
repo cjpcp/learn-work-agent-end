@@ -15,4 +15,14 @@ public class TransferToHumanRequest {
      * 转人工原因
      */
     private String reason;
+
+    /**
+     * 问题类型
+     */
+    private String questionType;
+
+    /**
+     * 用户填写的转接问题描述
+     */
+    private String questionText;
 }
