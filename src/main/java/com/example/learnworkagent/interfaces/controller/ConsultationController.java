@@ -17,6 +17,7 @@ import com.example.learnworkagent.domain.consultation.service.HumanTransferConfi
 import com.example.learnworkagent.domain.user.entity.Admin;
 import com.example.learnworkagent.domain.user.repository.AdminRepository;
 import com.example.learnworkagent.infrastructure.external.oss.OssService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -129,19 +130,19 @@ public class ConsultationController extends BaseController {
      */
     @Operation(summary = "申请转人工")
     @PostMapping("/questions/{id}/transfer")
-    public Result<Void> transferToHuman(@PathVariable Long id, @RequestBody TransferToHumanRequest request) {
+    public Result<Void> transferToHuman(@PathVariable Long id, @RequestBody TransferToHumanRequest request) throws JsonProcessingException {
         Long userId = getCurrentUserId();
         humanTransferService.createTransfer(id, userId, "MANUAL", request.getReason(),
-                request.getQuestionType(), request.getQuestionText());
+                request.getQuestionType(), request.getQuestionText(), request.getFiles());
         return Result.success();
     }
 
     @Operation(summary = "直接申请转人工（无关联问题）")
     @PostMapping("/transfer")
-    public Result<Void> directTransferToHuman(@RequestBody TransferToHumanRequest request) {
+    public Result<Void> directTransferToHuman(@RequestBody TransferToHumanRequest request) throws JsonProcessingException {
         Long userId = getCurrentUserId();
         humanTransferService.createTransfer(null, userId, "MANUAL", request.getReason(),
-                request.getQuestionType(), request.getQuestionText());
+                request.getQuestionType(), request.getQuestionText(), request.getFiles());
         return Result.success();
     }
 

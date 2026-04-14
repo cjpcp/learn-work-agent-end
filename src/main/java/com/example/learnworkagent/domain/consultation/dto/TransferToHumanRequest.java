@@ -25,4 +25,16 @@ public class TransferToHumanRequest {
      * 用户填写的转接问题描述
      */
     private String questionText;
+
+    /**
+     * 附件列表
+     */
+    private java.util.List<FileInfo> files;
+
+    @Data
+    public static class FileInfo {
+        private String url;
+        private String type;
+        private String name;
+    }
 }

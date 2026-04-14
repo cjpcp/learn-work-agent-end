@@ -41,6 +41,13 @@ public class HumanTransfer extends BaseEntity {
     private String questionText;
 
     /**
+     * 附件URL列表，JSON格式存储
+     */
+    @Comment("附件URL列表")
+    @Column(name = "file_urls", columnDefinition = "TEXT")
+    private String fileUrls;
+
+    /**
      * 用户ID
      */
     @Comment("用户ID")

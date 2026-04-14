@@ -4,10 +4,12 @@ import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
+import com.example.learnworkagent.domain.consultation.dto.TransferToHumanRequest;
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
 import com.example.learnworkagent.domain.consultation.entity.HumanTransfer;
 import com.example.learnworkagent.domain.consultation.repository.ConsultationQuestionRepository;
 import com.example.learnworkagent.domain.consultation.repository.HumanTransferRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -39,7 +41,8 @@ public class HumanTransferService {
      */
     @Transactional
     public void createTransfer(Long questionId, Long userId, String transferType, String reason,
-                               String questionType, String questionText) {
+                               String questionType, String questionText,
+                               java.util.List<TransferToHumanRequest.FileInfo> files) throws JsonProcessingException {
         HumanTransfer transfer = new HumanTransfer();
         transfer.setQuestionId(questionId);
         transfer.setUserId(userId);
@@ -47,6 +50,10 @@ public class HumanTransferService {
         transfer.setTransferReason(reason);
         transfer.setQuestionType(questionType);
         transfer.setQuestionText(questionText);
+
+        if (files != null && !files.isEmpty()) {
+            transfer.setFileUrls(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(files));
+        }
 
         if (questionId != null) {
             ConsultationQuestion question = consultationQuestionRepository.findById(questionId)
