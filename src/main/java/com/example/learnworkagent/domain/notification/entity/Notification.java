@@ -100,6 +100,7 @@ public class Notification extends BaseEntity {
                 .businessType(message.getBusinessType())
                 .channel(channel)
                 .channelStatus(channel + ":SUCCESS")
+                .isRead(false)
                 .build();
     }
 }

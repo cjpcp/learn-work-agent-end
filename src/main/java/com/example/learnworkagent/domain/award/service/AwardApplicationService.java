@@ -174,6 +174,8 @@ public class AwardApplicationService {
         application.setMaterialStatus(MATERIAL_STATUS_PENDING);
         application.setApprovalStatus(ApprovalStatusEnum.PENDING.getCode());
         application.setStudentName(request.getStudentName());
+        application.setGrade(request.getGrade());
+        application.setClassName(request.getClassName());
         return application;
     }
 

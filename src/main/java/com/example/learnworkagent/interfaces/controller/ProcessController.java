@@ -80,7 +80,7 @@ public class ProcessController extends BaseController {
     @Operation(summary = "获取销假待审批流程")
     @GetMapping("/pending/leave-cancel")
     public Result<PageResult<ProcessItem>> getPendingLeaveCancel(@AuthenticationPrincipal Admin admin, PageRequest pageRequest) {
-        return Result.success(processService.getCompletedLeaveCancel(admin, pageRequest));
+        return Result.success(processService.getPendingLeaveCancel(admin, pageRequest));
     }
 
     /**
@@ -132,7 +132,7 @@ public class ProcessController extends BaseController {
     @Operation(summary = "获取销假已完成流程")
     @GetMapping("/completed/leave-cancel")
     public Result<PageResult<ProcessItem>> getCompletedLeaveCancel(@AuthenticationPrincipal Admin admin, PageRequest pageRequest) {
-        return Result.success(processService.getPendingLeaveCancel(admin, pageRequest));
+        return Result.success(processService.getCompletedLeaveCancel(admin, pageRequest));
     }
 
     /**
