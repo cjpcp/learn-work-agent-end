@@ -1,7 +1,8 @@
 package com.example.learnworkagent.infrastructure.external.dify;
 
-import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.common.ResultCode;
+import com.example.learnworkagent.common.exception.BusinessException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -24,6 +25,7 @@ import java.util.Map;
 public class DifyWorkflowService {
 
     private final WebClient webClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${dify.workflow.base-url:http://localhost}")
     private String baseUrl;
@@ -43,7 +45,7 @@ public class DifyWorkflowService {
      * @param user     用户标识
      * @return 识别结果
      */
-    public Mono<Map<String, Object>> identifyDocuments(List<String> fileUrls, String user) {
+    public Mono<Map<String, Object>> identifyDocuments(List<String> fileUrls, String user,String applicationType) {
         if (fileUrls == null || fileUrls.isEmpty()) {
             return Mono.error(new BusinessException(ResultCode.PARAM_ERROR, "文件列表不能为空"));
         }
@@ -53,7 +55,7 @@ public class DifyWorkflowService {
             return Mono.error(new BusinessException(ResultCode.SYSTEM_ERROR, "Dify服务未配置"));
         }
 
-        Map<String, Object> requestBody = getStringObjectMap(fileUrls, user);
+        Map<String, Object> requestBody = getStringObjectMap(fileUrls, user,applicationType);
 
         log.info("调用Dify工作流识别文档，文件数: {}", fileUrls.size());
         log.debug("请求体: {}", requestBody);
@@ -65,6 +67,23 @@ public class DifyWorkflowService {
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {
+                })
+                .map(response -> {
+                    log.info("Dify工作流原始响应: {}", response);
+                    Map<?, ?> data = (Map<?, ?>) response.get("data");
+                    Map<String, Object> outputs = data != null ? (Map<String, Object>) data.get("outputs") : null;
+                    if (outputs != null && outputs.containsKey("text")) {
+                        String text = outputs.get("text").toString();
+                        text = text.replaceAll("```json\\n?", "").replaceAll("\\n?```", "").trim();
+                        try {
+                            Map<?, ?> parsed = objectMapper.readValue(text, Map.class);
+                            return (Map<String, Object>) parsed;
+                        } catch (Exception e) {
+                            log.error("解析Dify输出text失败: {}", text, e);
+                            return new HashMap<String, Object>();
+                        }
+                    }
+                    return outputs != null ? outputs : new HashMap<String, Object>();
                 })
                 .doOnSuccess(response -> log.info("Dify工作流调用成功: {}", response))
                 .doOnError(error -> {
@@ -88,7 +107,7 @@ public class DifyWorkflowService {
                 });
     }
 
-    private static Map<String, Object> getStringObjectMap(List<String> fileUrls, String user) {
+    private static Map<String, Object> getStringObjectMap(List<String> fileUrls, String user,String applicationType) {
         List<Map<String, Object>> files = new ArrayList<>();
         fileUrls.forEach(url -> {
             Map<String, Object> file = new HashMap<>();
@@ -100,6 +119,7 @@ public class DifyWorkflowService {
 
         Map<String, Object> inputs = new HashMap<>();
         inputs.put("file", files);
+        inputs.put("type", applicationType);
 
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("inputs", inputs);
@@ -141,7 +161,7 @@ public class DifyWorkflowService {
      * @param fileUrls 文件URL列表
      * @return 识别结果
      */
-    public Mono<Map<String, Object>> identifyDocuments(List<String> fileUrls) {
-        return identifyDocuments(fileUrls, "default-user");
+    public Mono<Map<String, Object>> identifyDocuments(List<String> fileUrls,String applicationType) {
+        return identifyDocuments(fileUrls, "default-user", applicationType);
     }
 }

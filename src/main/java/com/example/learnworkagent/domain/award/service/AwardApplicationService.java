@@ -17,6 +17,8 @@ import com.example.learnworkagent.infrastructure.external.dify.DifyWorkflowServi
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -24,6 +26,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -31,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -50,13 +55,16 @@ public class AwardApplicationService {
     private static final String MATERIAL_STATUS_PASSED = "PASSED";
     private static final String MATERIAL_STATUS_FAILED = "FAILED";
     private static final String MATERIAL_COMMENT_PASSED = "材料完整，通过预审";
-    private static final String MATERIAL_COMMENT_FAILED = "材料不完整，请补充相关材料";
-    private static final Duration MATERIAL_CHECK_TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration MATERIAL_CHECK_TIMEOUT = Duration.ofMinutes(2);
 
     private final AwardApplicationRepository awardApplicationRepository;
     private final DifyWorkflowService difyWorkflowService;
     private final ApprovalService approvalService;
     private final ObjectMapper objectMapper;
+    @Lazy
+    @Autowired
+    private AwardApplicationService self;
+
 
     @Transactional
     public AwardApplication submitAwardApplication(Long applicantId, AwardApplicationRequest request) {
@@ -65,18 +73,37 @@ public class AwardApplicationService {
 
         AwardApplication application = buildAwardApplication(applicantId, request);
         AwardApplication savedApplication = awardApplicationRepository.save(application);
-        preCheckMaterialsAsync(savedApplication.getId());
+        Long applicationId = savedApplication.getId();
         createApprovalFlow(savedApplication, applicantId, request);
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                self.preCheckMaterialsAsync(applicationId);
+            }
+        });
+
         return savedApplication;
     }
 
     @Async
+    @Transactional
     public void preCheckMaterialsAsync(Long applicationId) {
+        log.info("异步材料预审开始，申请ID: {}", applicationId);
         try {
             AwardApplication application = getApplicationById(applicationId);
-            boolean materialsComplete = checkMaterialsComplete(application);
-            applyMaterialReviewResult(application, materialsComplete);
+            if (application == null) {
+                log.error("异步材料预审失败：申请不存在，申请ID: {}", applicationId);
+                return;
+            }
+            log.info("异步材料预审，获取到申请: {}, 材料状态: {}", application.getId(), application.getMaterialStatus());
+            Map<String, Object> result = checkMaterialsComplete(application);
+            boolean materialsComplete = (boolean) result.get("pass");
+            String text = result.get("reason").toString();
+            log.info("异步材料预审，Dify返回结果: pass={}, reason={}", materialsComplete, text);
+            applyMaterialReviewResult(application, materialsComplete, text);
             awardApplicationRepository.save(application);
+            log.info("异步材料预审完成，申请ID: {}, 新状态: {}", applicationId, application.getMaterialStatus());
         } catch (Exception exception) {
             log.error("材料预审失败，申请ID: {}", applicationId, exception);
         }
@@ -120,48 +147,36 @@ public class AwardApplicationService {
         return buildPageResult(page, pageRequest);
     }
 
-    private boolean checkMaterialsComplete(AwardApplication application) {
+    private Map<String, Object> checkMaterialsComplete(AwardApplication application) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("pass", false);
+        result.put("reason", "");
         if (isBlank(application.getReason()) || isBlank(application.getAttachmentUrls())) {
-            return false;
+            result.put("pass", false);
+            result.put("reason", "请补充申请理由和附件");
+            return result;
         }
 
         List<String> fileUrls = Stream.of(application.getAttachmentUrls().split(","))
                 .map(String::trim)
                 .filter(url -> !url.isEmpty())
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
         if (fileUrls.isEmpty()) {
-            return false;
+            result.put("pass", false);
+            result.put("reason", "请补充附件");
+            return result;
         }
 
         try {
-            Map<String, Object> result = difyWorkflowService.identifyDocuments(fileUrls).block(MATERIAL_CHECK_TIMEOUT);
+            result = difyWorkflowService.identifyDocuments(fileUrls, application.getApplicationType()).block(MATERIAL_CHECK_TIMEOUT);
             log.info("Dify工作流识别结果: {}", result);
-            return switch (application.getApplicationType()) {
-                case "SCHOLARSHIP" -> checkScholarshipMaterials(result);
-                case "GRANT", "SUBSIDY" -> checkGrantMaterials(result);
-                default -> true;
-            };
+            return result;
         } catch (Exception exception) {
             log.error("Dify工作流识别失败", exception);
-            return false;
         }
+        return result;
     }
 
-    private boolean checkScholarshipMaterials(Map<String, Object> result) {
-        String output = readWorkflowOutput(result);
-        boolean hasTranscript = output.contains("成绩单");
-        boolean hasRecommendation = output.contains("推荐信");
-        log.info("奖学金材料检查结果 - 成绩单: {}, 推荐信: {}", hasTranscript, hasRecommendation);
-        return hasTranscript && hasRecommendation;
-    }
-
-    private boolean checkGrantMaterials(Map<String, Object> result) {
-        String output = readWorkflowOutput(result);
-        boolean hasFamilyProof = output.contains("家庭情况证明");
-        boolean hasIncomeProof = output.contains("收入证明");
-        log.info("助学金材料检查结果 - 家庭情况证明: {}, 收入证明: {}", hasFamilyProof, hasIncomeProof);
-        return hasFamilyProof && hasIncomeProof;
-    }
 
     private AwardApplication buildAwardApplication(Long applicantId, AwardApplicationRequest request) {
         AwardApplication application = new AwardApplication();
@@ -195,19 +210,12 @@ public class AwardApplicationService {
         return applicantInfo;
     }
 
-    private void applyMaterialReviewResult(AwardApplication application, boolean materialsComplete) {
+    private void applyMaterialReviewResult(AwardApplication application, boolean materialsComplete, String text) {
         application.setMaterialStatus(materialsComplete ? MATERIAL_STATUS_PASSED : MATERIAL_STATUS_FAILED);
-        application.setMaterialComment(materialsComplete ? MATERIAL_COMMENT_PASSED : MATERIAL_COMMENT_FAILED);
+        application.setMaterialComment(materialsComplete ? MATERIAL_COMMENT_PASSED : text);
         application.setMaterialReviewTime(LocalDateTime.now());
     }
 
-    private String readWorkflowOutput(Map<String, Object> result) {
-        if (result == null) {
-            return "";
-        }
-        Object output = result.get("output");
-        return output == null ? "" : output.toString().toLowerCase();
-    }
 
     private ApprovalTask getCurrentTask(ApprovalInstance approvalInstance, Long approverId) {
         if (approvalInstance == null) {
