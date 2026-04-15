@@ -1,6 +1,7 @@
 package com.example.learnworkagent.domain.award.entity;
 
 import com.example.learnworkagent.common.BaseEntity;
+import com.example.learnworkagent.common.enums.MaterialStatusEnum;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Comment;
 import lombok.Data;
@@ -61,8 +62,9 @@ public class AwardApplication extends BaseEntity {
      * 材料预审状态（PENDING-待预审, PASSED-通过, FAILED-未通过）
      */
     @Comment("材料预审状态")
+    @Enumerated(EnumType.STRING)
     @Column(name = "material_status", nullable = false, length = 20)
-    private String materialStatus = "PENDING";
+    private MaterialStatusEnum materialStatus = MaterialStatusEnum.PENDING;
 
     /**
      * 材料预审意见

@@ -17,4 +17,7 @@ public class ProcessItem {
     private String status;
     private String description;
     private Boolean allowAction;
+    private String comment;
+    private String materialStatus;
+    private String materialComment;
 }

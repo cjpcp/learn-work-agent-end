@@ -62,7 +62,14 @@ public class ConsultationQuestion extends BaseEntity {
     private String aiAnswer;
 
     /**
-     * 回答来源（AI-智能回答, HUMAN-人工回答
+     * 人工回复内容（工作人员回复后存储在此字段，不覆盖AI回答）
+     */
+    @Comment("人工回复内容")
+    @Column(name = "human_reply", columnDefinition = "TEXT")
+    private String humanReply;
+
+    /**
+     * 回答来源（AI-智能回答, HUMAN-人工回答）
      */
     @Comment("回答来源")
     @Column(name = "answer_source", length = 20)

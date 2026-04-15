@@ -144,17 +144,27 @@ public class ApprovalServiceImpl implements ApprovalService {
     @Override
     public List<ApprovalTaskDTO> getPendingTasks(Long approverId) {
         List<ApprovalTask> tasks = taskRepository.findByApproverIdAndStatus(approverId, TASK_PROCESSING);
-        return tasks.stream().map(task -> {
-            ApprovalTaskDTO dto = new ApprovalTaskDTO();
-            dto.setId(task.getId());
-            dto.setBusinessId(task.getInstance().getBusinessId());
-            dto.setBusinessType(task.getInstance().getBusinessType());
-            dto.setStatus(task.getStatus());
-            dto.setCreateTime(task.getCreateTime());
-            dto.setApproverId(task.getApproverId());
-            dto.setStepName(task.getStep().getStepName());
-            return dto;
-        }).toList();
+        return tasks.stream()
+            .filter(task -> {
+                if (BUSINESS_TYPE_AWARD.equals(task.getInstance().getBusinessType())) {
+                    Long businessId = task.getInstance().getBusinessId();
+                    return awardApplicationRepository.findById(businessId)
+                        .map(app -> !INSTANCE_REJECTED.equals(app.getApprovalStatus()))
+                        .orElse(false);
+                }
+                return true;
+            })
+            .map(task -> {
+                ApprovalTaskDTO dto = new ApprovalTaskDTO();
+                dto.setId(task.getId());
+                dto.setBusinessId(task.getInstance().getBusinessId());
+                dto.setBusinessType(task.getInstance().getBusinessType());
+                dto.setStatus(task.getStatus());
+                dto.setCreateTime(task.getCreateTime());
+                dto.setApproverId(task.getApproverId());
+                dto.setStepName(task.getStep().getStepName());
+                return dto;
+            }).toList();
     }
 
     @Override

@@ -447,6 +447,8 @@ public class ConsultationController extends BaseController {
                 map.put("id", q.getId());
                 map.put("questionText", q.getQuestionText());
                 map.put("answer", q.getAiAnswer());
+                map.put("humanReply", q.getHumanReply());
+                map.put("answerSource", q.getAnswerSource());
                 map.put("createTime", q.getCreateTime());
                 map.put("files", consultationService.parseFileUrls(q.getFileUrls()));
                 return map;

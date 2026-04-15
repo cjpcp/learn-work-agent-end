@@ -58,7 +58,7 @@ public class LeaveApplication extends BaseEntity {
 
     /** 附件地址。 */
     @Comment("附件URL")
-    @Column(name = "attachment_url", length = 500)
+    @Column(name = "attachment_url", columnDefinition = "TEXT")
     private String attachmentUrl;
 
     /** 审批人ID。 */

@@ -116,7 +116,7 @@ public class HumanTransferService {
         if (transfer.getQuestionId() != null) {
             ConsultationQuestion question = consultationQuestionRepository.findById(transfer.getQuestionId())
                     .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "咨询问题不存在"));
-            question.setAiAnswer(reply);
+            question.setHumanReply(reply);
             question.setAnswerSource("HUMAN");
             question.setStatus("ANSWERED");
             consultationQuestionRepository.save(question);
@@ -137,7 +137,7 @@ public class HumanTransferService {
         if (transfer.getQuestionId() != null) {
             ConsultationQuestion question = consultationQuestionRepository.findById(transfer.getQuestionId())
                     .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "咨询问题不存在"));
-            question.setAiAnswer(reply);
+            question.setHumanReply(reply);
             question.setAnswerSource("HUMAN");
             question.setStatus("ANSWERED");
             consultationQuestionRepository.save(question);

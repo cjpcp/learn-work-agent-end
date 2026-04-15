@@ -3,6 +3,7 @@ package com.example.learnworkagent.domain.process.service;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
+import com.example.learnworkagent.common.enums.MaterialStatusEnum;
 import com.example.learnworkagent.common.enums.NotificationBusinessTypeEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
@@ -77,8 +78,8 @@ public class ProcessService {
                         application.getCreateTime().format(DATE_TIME_FORMATTER), PROCESS_STATUS_PENDING, "您的请假申请正在审批中"));
             }
 
-            var pendingAwardApps = awardApplicationRepository.findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(
-                    admin.getId(), ApprovalStatusEnum.PENDING.getCode(), PageRequest.of(0, PROCESS_PAGE_SIZE)
+            var pendingAwardApps = awardApplicationRepository.findByApplicantIdAndApprovalStatusAndMaterialStatusAndDeletedFalseOrderByCreateTimeDesc(
+                    admin.getId(), ApprovalStatusEnum.PENDING.getCode(), MaterialStatusEnum.PASSED, PageRequest.of(0, PROCESS_PAGE_SIZE)
             );
             for (AwardApplication application : pendingAwardApps.getContent()) {
                 allPending.add(buildProcessItem(application.getId(), AWARD_APPLICATION_NAME, PROCESS_TYPE_AWARD,
@@ -88,6 +89,14 @@ public class ProcessService {
             var pendingTasks = approvalTaskRepository.findByApproverIdAndStatus(admin.getId(), ApprovalStatusEnum.PROCESSING.getCode());
             for (ApprovalTask task : pendingTasks) {
                 boolean leaveBusiness = NotificationBusinessTypeEnum.LEAVE.getCode().equals(task.getInstance().getBusinessType());
+                if (!leaveBusiness) {
+                    Long businessId = task.getInstance().getBusinessId();
+                    var awardApp = awardApplicationRepository.findById(businessId).orElse(null);
+                    if (awardApp == null || !ApprovalStatusEnum.PENDING.getCode().equals(awardApp.getApprovalStatus())
+                            || awardApp.getMaterialStatus() != MaterialStatusEnum.PASSED) {
+                        continue;
+                    }
+                }
                 allPending.add(buildProcessItem(
                         task.getInstance().getBusinessId(),
                         leaveBusiness ? LEAVE_APPROVAL_NAME : AWARD_APPROVAL_NAME,
@@ -120,8 +129,8 @@ public class ProcessService {
         List<ProcessItem> pendingAward = new ArrayList<>();
 
         if (isStudent(admin)) {
-            var pendingApps = awardApplicationRepository.findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(
-                    admin.getId(), ApprovalStatusEnum.PENDING.getCode(), PageRequest.of(0, PROCESS_PAGE_SIZE)
+            var pendingApps = awardApplicationRepository.findByApplicantIdAndApprovalStatusAndMaterialStatusAndDeletedFalseOrderByCreateTimeDesc(
+                    admin.getId(), ApprovalStatusEnum.PENDING.getCode(), MaterialStatusEnum.PASSED, PageRequest.of(0, PROCESS_PAGE_SIZE)
             );
             for (AwardApplication application : pendingApps.getContent()) {
                 pendingAward.add(buildProcessItem(application.getId(), AWARD_APPLICATION_NAME, PROCESS_TYPE_AWARD,
@@ -132,8 +141,14 @@ public class ProcessService {
             for (ApprovalTask task : pendingTasks) {
                 boolean leaveBusiness = NotificationBusinessTypeEnum.LEAVE.getCode().equals(task.getInstance().getBusinessType());
                 if (!leaveBusiness) {
+                    Long businessId = task.getInstance().getBusinessId();
+                    var awardApp = awardApplicationRepository.findById(businessId).orElse(null);
+                    if (awardApp == null || !ApprovalStatusEnum.PENDING.getCode().equals(awardApp.getApprovalStatus())
+                            || awardApp.getMaterialStatus() != MaterialStatusEnum.PASSED) {
+                        continue;
+                    }
                     pendingAward.add(buildProcessItem(
-                            task.getInstance().getBusinessId(),
+                            businessId,
                             AWARD_APPROVAL_NAME,
                             PROCESS_TYPE_AWARD,
                             task.getInstance().getCreateTime().format(DATE_TIME_FORMATTER),
@@ -404,11 +419,15 @@ public class ProcessService {
         if (application == null) {
             return new ProcessItem();
         }
-        return buildProcessItem(
+        ProcessItem item = buildProcessItem(
                 application.getId(), "奖助学金审批", PROCESS_TYPE_AWARD,
                 application.getCreateTime().format(DATE_TIME_FORMATTER),
                 application.getApprovalStatus(), "用户的奖助学金申请"
         );
+        item.setComment(application.getApprovalComment());
+        item.setMaterialStatus(application.getMaterialStatus() != null ? application.getMaterialStatus().getCode() : null);
+        item.setMaterialComment(application.getMaterialComment());
+        return item;
     }
 
     private ProcessItem buildLeaveCancelProcessDetail(String id) {

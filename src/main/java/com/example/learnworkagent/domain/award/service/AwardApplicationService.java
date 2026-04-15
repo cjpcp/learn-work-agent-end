@@ -4,6 +4,7 @@ import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
+import com.example.learnworkagent.common.enums.MaterialStatusEnum;
 import com.example.learnworkagent.common.enums.NotificationBusinessTypeEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.domain.approval.dto.ApprovalTaskDTO;
@@ -51,9 +52,6 @@ public class AwardApplicationService {
 
     private static final String BUSINESS_TYPE_AWARD = NotificationBusinessTypeEnum.AWARD.getCode();
     private static final String SORT_FIELD_CREATE_TIME = "createTime";
-    private static final String MATERIAL_STATUS_PENDING = "PENDING";
-    private static final String MATERIAL_STATUS_PASSED = "PASSED";
-    private static final String MATERIAL_STATUS_FAILED = "FAILED";
     private static final String MATERIAL_COMMENT_PASSED = "材料完整，通过预审";
     private static final Duration MATERIAL_CHECK_TIMEOUT = Duration.ofMinutes(2);
 
@@ -115,7 +113,10 @@ public class AwardApplicationService {
     @Transactional
     public void approveAwardApplication(Long applicationId, Long approverId, String approvalStatus, String approvalComment) {
         AwardApplication application = getApplicationById(applicationId);
-        if (!MATERIAL_STATUS_PASSED.equals(application.getMaterialStatus())) {
+        if (application == null) {
+            throw new BusinessException(ResultCode.AWARD_APPLICATION_NOT_FOUND);
+        }
+        if (!MaterialStatusEnum.PASSED.equals(application.getMaterialStatus())) {
             throw new BusinessException(ResultCode.PARAM_ERROR, "材料预审未通过，无法审批");
         }
 
@@ -125,8 +126,11 @@ public class AwardApplicationService {
     }
 
     public AwardApplication getApplicationById(Long applicationId) {
+        if (applicationId == null) {
+            return null;
+        }
         return awardApplicationRepository.findById(applicationId)
-                .orElseThrow(() -> new BusinessException(ResultCode.AWARD_APPLICATION_NOT_FOUND));
+                .orElse(null);
     }
 
     public PageResult<AwardApplication> getUserApplications(Long userId, PageRequest pageRequest) {
@@ -189,7 +193,7 @@ public class AwardApplicationService {
         application.setAmount(request.getAmount());
         application.setReason(request.getReason());
         application.setAttachmentUrls(request.getAttachmentUrls());
-        application.setMaterialStatus(MATERIAL_STATUS_PENDING);
+        application.setMaterialStatus(MaterialStatusEnum.PENDING);
         application.setApprovalStatus(ApprovalStatusEnum.PENDING.getCode());
         application.setStudentName(request.getStudentName());
         application.setGrade(request.getGrade());
@@ -214,11 +218,12 @@ public class AwardApplicationService {
     }
 
     private void applyMaterialReviewResult(AwardApplication application, boolean materialsComplete, String text) {
-        application.setMaterialStatus(materialsComplete ? MATERIAL_STATUS_PASSED : MATERIAL_STATUS_FAILED);
+        application.setMaterialStatus(materialsComplete ? MaterialStatusEnum.PASSED : MaterialStatusEnum.FAILED);
         application.setMaterialComment(materialsComplete ? MATERIAL_COMMENT_PASSED : text);
         application.setMaterialReviewTime(LocalDateTime.now());
         if (!materialsComplete) {
             application.setApprovalStatus(ApprovalStatusEnum.REJECTED.getCode());
+            application.setApprovalComment("材料预审不通过：" + text);
         }
     }
 
@@ -258,6 +263,9 @@ public class AwardApplicationService {
     @Transactional
     public void cancelAwardApplication(Long applicationId, Long userId) {
         AwardApplication application = getApplicationById(applicationId);
+        if (application == null) {
+            throw new BusinessException(ResultCode.AWARD_APPLICATION_NOT_FOUND);
+        }
         if (!application.getApplicantId().equals(userId)) {
             throw new BusinessException(ResultCode.FORBIDDEN, "无权操作此申请");
         }

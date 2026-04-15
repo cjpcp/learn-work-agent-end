@@ -34,4 +34,16 @@ public interface AwardApplicationRepository extends JpaRepository<AwardApplicati
      * @return 奖助申请分页列表
      */
     Page<AwardApplication> findByApplicantIdAndApprovalStatusAndDeletedFalseOrderByCreateTimeDesc(Long applicantId, String approvalStatus, Pageable pageable);
+
+    /**
+     * 根据申请人ID、审批状态和材料预审状态查询.
+     *
+     * @param applicantId    申请人ID
+     * @param approvalStatus  审批状态
+     * @param materialStatus  材料预审状态
+     * @param pageable        分页参数
+     * @return 奖助申请分页列表
+     */
+    Page<AwardApplication> findByApplicantIdAndApprovalStatusAndMaterialStatusAndDeletedFalseOrderByCreateTimeDesc(
+            Long applicantId, String approvalStatus, com.example.learnworkagent.common.enums.MaterialStatusEnum materialStatus, Pageable pageable);
 }
