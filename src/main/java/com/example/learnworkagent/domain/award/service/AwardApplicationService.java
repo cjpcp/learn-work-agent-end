@@ -103,6 +103,9 @@ public class AwardApplicationService {
             log.info("异步材料预审，Dify返回结果: pass={}, reason={}", materialsComplete, text);
             applyMaterialReviewResult(application, materialsComplete, text);
             awardApplicationRepository.save(application);
+            if (!materialsComplete) {
+                approvalService.rejectPendingTasks(BUSINESS_TYPE_AWARD, applicationId, text);
+            }
             log.info("异步材料预审完成，申请ID: {}, 新状态: {}", applicationId, application.getMaterialStatus());
         } catch (Exception exception) {
             log.error("材料预审失败，申请ID: {}", applicationId, exception);
@@ -214,6 +217,9 @@ public class AwardApplicationService {
         application.setMaterialStatus(materialsComplete ? MATERIAL_STATUS_PASSED : MATERIAL_STATUS_FAILED);
         application.setMaterialComment(materialsComplete ? MATERIAL_COMMENT_PASSED : text);
         application.setMaterialReviewTime(LocalDateTime.now());
+        if (!materialsComplete) {
+            application.setApprovalStatus(ApprovalStatusEnum.REJECTED.getCode());
+        }
     }
 
 

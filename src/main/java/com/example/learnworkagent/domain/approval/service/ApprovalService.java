@@ -65,4 +65,13 @@ public interface ApprovalService {
      * @param businessId   业务记录ID
      */
     void cancelApprovalInstance(String businessType, Long businessId);
+
+    /**
+     * 拒绝指定业务的所有进行中的审批任务（用于材料预审失败等情况）.
+     *
+     * @param businessType 业务类型
+     * @param businessId   业务记录ID
+     * @param reason       拒绝原因
+     */
+    void rejectPendingTasks(String businessType, Long businessId, String reason);
 }

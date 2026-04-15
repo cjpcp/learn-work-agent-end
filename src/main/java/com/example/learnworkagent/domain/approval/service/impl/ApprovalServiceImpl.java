@@ -476,4 +476,24 @@ public class ApprovalServiceImpl implements ApprovalService {
         instanceRepository.save(instance);
         updateBusinessStatus(instance, null, "申请人撤销申请");
     }
+
+    @Override
+    public void rejectPendingTasks(String businessType, Long businessId, String reason) {
+        ApprovalInstance instance = getApprovalInstance(businessType, businessId);
+        if (instance == null) {
+            log.warn("拒绝待审批任务失败：审批实例不存在，businessType: {}, businessId: {}", businessType, businessId);
+            return;
+        }
+        List<ApprovalTask> tasks = taskRepository.findByInstanceId(instance.getId());
+        tasks.forEach(task -> {
+            if (TASK_PROCESSING.equals(task.getStatus())) {
+                task.markRejected(reason);
+                taskRepository.save(task);
+            }
+        });
+        instance.markRejected();
+        instanceRepository.save(instance);
+        updateBusinessStatus(instance, null, reason);
+        notifyApplicant(instance, INSTANCE_REJECTED, null, reason);
+    }
 }
