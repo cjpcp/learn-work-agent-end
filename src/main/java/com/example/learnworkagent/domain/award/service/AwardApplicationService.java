@@ -53,7 +53,7 @@ public class AwardApplicationService {
     private static final String BUSINESS_TYPE_AWARD = NotificationBusinessTypeEnum.AWARD.getCode();
     private static final String SORT_FIELD_CREATE_TIME = "createTime";
     private static final String MATERIAL_COMMENT_PASSED = "材料完整，通过预审";
-    private static final Duration MATERIAL_CHECK_TIMEOUT = Duration.ofMinutes(2);
+    private static final Duration MATERIAL_CHECK_TIMEOUT = Duration.ofMinutes(5);
 
     private final AwardApplicationRepository awardApplicationRepository;
     private final DifyWorkflowService difyWorkflowService;
@@ -180,6 +180,8 @@ public class AwardApplicationService {
             return result;
         } catch (Exception exception) {
             log.error("Dify工作流识别失败", exception);
+            result.put("pass", false);
+            result.put("reason", "材料预审服务响应超时，请稍后重试或联系管理员");
         }
         return result;
     }

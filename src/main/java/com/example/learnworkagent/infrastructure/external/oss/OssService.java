@@ -1,5 +1,6 @@
 package com.example.learnworkagent.infrastructure.external.oss;
 
+import com.aliyun.oss.ClientBuilderConfiguration;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
 import com.aliyun.oss.model.ObjectMetadata;
@@ -58,7 +59,10 @@ public class OssService {
             String fileName = folder + "/" + UUID.randomUUID() + fileExtension;
 
             // 创建OSS客户端
-            OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
+            ClientBuilderConfiguration config = new ClientBuilderConfiguration();
+            config.setConnectionTimeout(30000);
+            config.setSocketTimeout(30000);
+            OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret, config);
 
             try {
                 // 检查bucket是否存在
