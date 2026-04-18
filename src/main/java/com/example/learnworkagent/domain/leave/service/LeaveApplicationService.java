@@ -276,7 +276,7 @@ public class LeaveApplicationService {
             for (ApprovalTask task : pendingTasks) {
                 ApprovalTask fullTask = approvalService.getTaskById(task.getId());
                 if (fullTask != null) {
-                    items.add(buildLeaveApprovalProcessItem(fullTask, true));
+                    items.add(buildLeaveApprovalProcessItem(fullTask));
                 }
             }
         } else {
@@ -400,15 +400,15 @@ public class LeaveApplicationService {
         return item;
     }
 
-    private ProcessItem buildLeaveApprovalProcessItem(ApprovalTask task, boolean isStaff) {
+    private ProcessItem buildLeaveApprovalProcessItem(ApprovalTask task) {
         return buildProcessItem(
                 task.getInstance().getBusinessId(),
                 LEAVE_APPROVAL_NAME,
                 PROCESS_TYPE_LEAVE,
                 task.getInstance().getCreateTime().format(DATE_TIME_FORMATTER),
                 PROCESS_STATUS_PENDING,
-                isStaff ? "学生的请假申请需要您审批" : "您的请假申请正在审批中",
-                isStaff
+                "学生的请假申请需要您审批",
+                true
         );
     }
 
