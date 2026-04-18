@@ -2,7 +2,6 @@ package com.example.learnworkagent.domain.approval.service.impl;
 
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
-import com.example.learnworkagent.common.enums.LeaveTypeEnum;
 import com.example.learnworkagent.common.enums.NotificationBusinessTypeEnum;
 import com.example.learnworkagent.common.enums.NotificationChannelEnum;
 import com.example.learnworkagent.common.enums.NotificationTypeEnum;
@@ -16,6 +15,8 @@ import com.example.learnworkagent.domain.approval.repository.ApprovalInstanceRep
 import com.example.learnworkagent.domain.approval.repository.ApprovalProcessRepository;
 import com.example.learnworkagent.domain.approval.repository.ApprovalStepRepository;
 import com.example.learnworkagent.domain.approval.repository.ApprovalTaskRepository;
+import com.example.learnworkagent.domain.approval.handler.BusinessTypeHandler;
+import com.example.learnworkagent.domain.approval.handler.BusinessTypeHandlerFactory;
 import com.example.learnworkagent.domain.approval.service.ApprovalService;
 import com.example.learnworkagent.domain.award.entity.AwardApplication;
 import com.example.learnworkagent.domain.award.repository.AwardApplicationRepository;
@@ -53,7 +54,6 @@ import java.util.List;
 @Transactional
 public class ApprovalServiceImpl implements ApprovalService {
 
-    private static final String BUSINESS_TYPE_LEAVE = NotificationBusinessTypeEnum.LEAVE.getCode();
     private static final String BUSINESS_TYPE_AWARD = NotificationBusinessTypeEnum.AWARD.getCode();
     private static final List<String> DEFAULT_NOTIFICATION_CHANNELS = List.of(
             NotificationChannelEnum.SITE.getCode(),
@@ -78,8 +78,9 @@ public class ApprovalServiceImpl implements ApprovalService {
     private final AdminRepository            adminRepository;
     private final TeacherRepository          teacherRepository;
     private final RoleRepository             roleRepository;
-    private final NotificationService        notificationService;
     private final ObjectMapper               objectMapper;
+    private final NotificationService        notificationService;
+    private final BusinessTypeHandlerFactory handlerFactory;
 
     // =======================================================
     // 公开接口
@@ -289,44 +290,13 @@ public class ApprovalServiceImpl implements ApprovalService {
         Long businessId = instance.getBusinessId();
         Long approverId = resolveApproverId(instance, fallbackApproverId);
         try {
-            if (BUSINESS_TYPE_LEAVE.equals(instance.getBusinessType())) {
-                leaveApplicationRepository.findById(businessId).ifPresent(application -> {
-                    applyApprovalFields(application, status, approverId, approvalComment);
-                    leaveApplicationRepository.save(application);
-                });
-            } else if (BUSINESS_TYPE_AWARD.equals(instance.getBusinessType())) {
-                awardApplicationRepository.findById(businessId).ifPresent(application -> {
-                    applyApprovalFields(application, status, approverId, approvalComment);
-                    awardApplicationRepository.save(application);
-                });
+            BusinessTypeHandler handler = handlerFactory.getHandler(instance.getBusinessType());
+            if (handler != null) {
+                handler.updateStatus(businessId, status, approverId, approvalComment);
             }
         } catch (Exception exception) {
             log.error("更新业务状态失败，businessType: {}, businessId: {}", instance.getBusinessType(), businessId, exception);
         }
-    }
-
-    private void applyApprovalFields(LeaveApplication application, String status, Long approverId, String approvalComment) {
-        application.setApprovalStatus(status);
-        application.setApproverId(approverId);
-        if (INSTANCE_PENDING.equals(status)) {
-            application.setApprovalComment(null);
-            application.setApprovalTime(null);
-            return;
-        }
-        application.setApprovalComment(approvalComment);
-        application.setApprovalTime(LocalDateTime.now());
-    }
-
-    private void applyApprovalFields(AwardApplication application, String status, Long approverId, String approvalComment) {
-        application.setApprovalStatus(status);
-        application.setApproverId(approverId);
-        if (INSTANCE_PENDING.equals(status)) {
-            application.setApprovalComment(null);
-            application.setApprovalTime(null);
-            return;
-        }
-        application.setApprovalComment(approvalComment);
-        application.setApprovalTime(LocalDateTime.now());
     }
 
     private Long resolveApproverId(ApprovalInstance instance, Long fallbackApproverId) {
@@ -426,27 +396,11 @@ public class ApprovalServiceImpl implements ApprovalService {
     private void fillNotificationBusinessInfo(NotificationMessage message, ApprovalInstance instance, Admin receiver) {
         message.setApplicantName(resolveDisplayName(receiver));
 
-        if (BUSINESS_TYPE_AWARD.equals(instance.getBusinessType())) {
-            AwardApplication application = awardApplicationRepository.findById(instance.getBusinessId()).orElse(null);
-            if (application != null) {
-                message.setApplicantName(application.getStudentName() != null ? application.getStudentName() : resolveDisplayName(receiver));
-                message.setApplicationType(application.getApplicationType());
-                message.setAwardName(application.getAwardName());
-                message.setAmount(application.getAmount());
-            }
-            return;
-        }
-
-        if (BUSINESS_TYPE_LEAVE.equals(instance.getBusinessType())) {
-            LeaveApplication application = leaveApplicationRepository.findById(instance.getBusinessId()).orElse(null);
-            if (application != null) {
-                message.setApplicantName(application.getStudentName() != null ? application.getStudentName() : resolveDisplayName(receiver));
-                message.setApplicationType(BUSINESS_TYPE_LEAVE);
-                message.setAwardName(LeaveTypeEnum.getDescriptionByCode(application.getLeaveType()));
-                message.setLeaveStartDate(application.getStartDate());
-                message.setLeaveEndDate(application.getEndDate());
-                message.setLeaveDays(application.getDays());
-                message.setLeaveReason(application.getReason());
+        BusinessTypeHandler handler = handlerFactory.getHandler(instance.getBusinessType());
+        if (handler != null) {
+            handler.fillNotificationBusinessInfo(message, instance.getBusinessId());
+            if (message.getApplicantName() == null) {
+                message.setApplicantName(resolveDisplayName(receiver));
             }
         }
     }
@@ -462,7 +416,8 @@ public class ApprovalServiceImpl implements ApprovalService {
     }
 
     private String resolveBusinessName(String businessType) {
-        return BUSINESS_TYPE_LEAVE.equals(businessType) ? "请假申请" : "奖助申请";
+        BusinessTypeHandler handler = handlerFactory.getHandler(businessType);
+        return handler != null ? handler.getBusinessName() : "未知申请";
     }
 
     private String resolveApplicantStatusText(String finalStatus) {
