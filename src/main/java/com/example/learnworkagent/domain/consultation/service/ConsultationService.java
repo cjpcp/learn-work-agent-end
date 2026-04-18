@@ -49,13 +49,13 @@ public class ConsultationService {
      * 提交咨询问题.
      * <p>创建问题记录后，异步调用Agent服务进行智能回答.</p>
      *
-     * @param userId      提问用户ID
+     * @param userId       提问用户ID
      * @param questionText 问题文本内容
      * @param questionType 问题类型（TEXT/VOICE）
-     * @param category    问题分类
-     * @param voiceUrl    语音文件URL（可选）
-     * @param sessionId   会话ID（可选，用于关联多轮对话）
-     * @param files       附件列表（可选）
+     * @param category     问题分类
+     * @param voiceUrl     语音文件URL（可选）
+     * @param sessionId    会话ID（可选，用于关联多轮对话）
+     * @param files        附件列表（可选）
      * @return 创建的咨询问题记录
      */
     @Transactional
@@ -183,7 +183,8 @@ public class ConsultationService {
         String fileUrlsJson = question.getFileUrls();
         if (fileUrlsJson != null && !fileUrlsJson.isBlank()) {
             try {
-                List<String> urls = objectMapper.readValue(fileUrlsJson, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                List<String> urls = objectMapper.readValue(fileUrlsJson, new com.fasterxml.jackson.core.type.TypeReference<>() {
+                });
                 if (urls != null && !urls.isEmpty()) {
                     List<Map<String, Object>> files = new ArrayList<>();
                     for (String url : urls) {
@@ -196,7 +197,10 @@ public class ConsultationService {
                             String name = url.substring(lastSlash + 1);
                             int qIdx = name.indexOf('?');
                             if (qIdx > 0) name = name.substring(0, qIdx);
-                            try { name = java.net.URLDecoder.decode(name, StandardCharsets.UTF_8); } catch (Exception ignored) {}
+                            try {
+                                name = java.net.URLDecoder.decode(name, StandardCharsets.UTF_8);
+                            } catch (Exception ignored) {
+                            }
                             fileMap.put("name", name);
                         } else {
                             fileMap.put("name", "附件");
@@ -212,35 +216,23 @@ public class ConsultationService {
         return dto;
     }
 
-    /**
-     * 对指定问题的回答进行满意度评价.
-     *
-     * @param questionId        问题ID
-     * @param satisfactionScore 满意度评分
-     */
-    @Transactional
-    public void rateQuestion(Long questionId, Integer satisfactionScore) {
-        ConsultationQuestion question = getQuestionById(questionId);
-        question.setSatisfactionScore(satisfactionScore);
-        consultationQuestionRepository.save(question);
-    }
 
     /**
      * 提交咨询问题并返回流式响应.
      * <p>用于需要实时获取AI回答的场景，返回Flux流式响应.</p>
      *
-     * @param userId      提问用户ID
+     * @param userId       提问用户ID
      * @param questionText 问题文本内容
      * @param questionType 问题类型（TEXT/VOICE）
-     * @param category    问题分类
-     * @param voiceUrl    语音文件URL（可选）
-     * @param sessionId   会话ID（可选）
-     * @param files       附件列表（可选）
+     * @param category     问题分类
+     * @param voiceUrl     语音文件URL（可选）
+     * @param sessionId    会话ID（可选）
+     * @param files        附件列表（可选）
      * @return AI回答内容的流
      */
     public Mono<ConsultationQuestion> createQuestion(Long userId, String questionText, String questionType,
-                                              String category, String voiceUrl, String sessionId,
-                                              List<ConsultationRequest.FileInput> files) {
+                                                     String category, String voiceUrl, String sessionId,
+                                                     List<ConsultationRequest.FileInput> files) {
         ConsultationQuestion question = new ConsultationQuestion();
         question.setUserId(userId);
         question.setQuestionText(questionText);

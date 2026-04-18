@@ -104,13 +104,6 @@ public class ConsultationQuestion extends BaseEntity {
     private Boolean isAnswering = false;
 
     /**
-     * 满意度评分（1-5�?
-     */
-    @Comment("满意度评")
-    @Column(name = "satisfaction_score")
-    private Integer satisfactionScore;
-
-    /**
      * 会话ID（标识同一次连续对话，用于上下文关联）
      */
     @Comment("会话ID")
