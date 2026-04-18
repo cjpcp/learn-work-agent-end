@@ -102,9 +102,7 @@ public class ConsultationAgentService {
                         question.setConversationId(convId);
                         consultationQuestionRepository.save(question);
                     })
-                    .doOnNext(partial -> {
-                        partialAnswer.append(partial);
-                    })
+                    .doOnNext(partialAnswer::append)
                     .collectList()
                     .subscribe(
                             answerList -> {
@@ -116,7 +114,7 @@ public class ConsultationAgentService {
                             },
                             error -> {
                                 log.error("AI服务调用失败，问题ID: {}", questionId, error);
-                                if (partialAnswer.length() > 0) {
+                                if (!partialAnswer.isEmpty()) {
                                     question.setAiAnswer(partialAnswer.toString());
                                 }
                                 question.setIsAnswering(false);
@@ -303,9 +301,7 @@ public class ConsultationAgentService {
                                         question.setConversationId(convId);
                                         consultationQuestionRepository.save(question);
                                     })
-                            .doOnNext(partial -> {
-                                partialAnswer.append(partial);
-                            })
+                            .doOnNext(partialAnswer::append)
                             .doOnComplete(() -> {
                                 log.info("Dify API调用完成，问题ID: {}", questionId);
                                 Mono.fromRunnable(() -> {
@@ -322,7 +318,7 @@ public class ConsultationAgentService {
                             .doOnError(error -> {
                                 log.error("AI服务调用失败，问题ID: {}", questionId, error);
                                 Mono.fromRunnable(() -> {
-                                            if (partialAnswer.length() > 0) {
+                                            if (!partialAnswer.isEmpty()) {
                                                 question.setAiAnswer(partialAnswer.toString());
                                             }
                                             question.setIsAnswering(false);

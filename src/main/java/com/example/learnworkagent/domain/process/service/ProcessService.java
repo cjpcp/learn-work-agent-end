@@ -3,11 +3,7 @@ package com.example.learnworkagent.domain.process.service;
 import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
-import com.example.learnworkagent.common.enums.MaterialStatusEnum;
-import com.example.learnworkagent.common.enums.NotificationBusinessTypeEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
-import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
-import com.example.learnworkagent.domain.approval.repository.ApprovalTaskRepository;
 import com.example.learnworkagent.domain.award.entity.AwardApplication;
 import com.example.learnworkagent.domain.award.repository.AwardApplicationRepository;
 import com.example.learnworkagent.domain.award.service.AwardApplicationService;
@@ -16,9 +12,7 @@ import com.example.learnworkagent.domain.leave.repository.LeaveApplicationReposi
 import com.example.learnworkagent.domain.leave.service.LeaveApplicationService;
 import com.example.learnworkagent.domain.process.dto.ProcessItem;
 import com.example.learnworkagent.domain.user.entity.Admin;
-
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
@@ -36,22 +30,16 @@ import java.util.List;
 public class ProcessService {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final int PROCESS_PAGE_SIZE = 100;
     private static final String PROCESS_STATUS_PENDING = "pending";
     private static final String PROCESS_STATUS_COMPLETED = "completed";
     private static final String PROCESS_TYPE_LEAVE = "leave";
     private static final String PROCESS_TYPE_AWARD = "award";
     private static final String PROCESS_TYPE_LEAVE_CANCEL = "leave_cancel";
-    private static final String LEAVE_APPLICATION_NAME = "请假申请";
-    private static final String AWARD_APPLICATION_NAME = "奖助申请";
     private static final String LEAVE_CANCEL_APPLICATION_NAME = "销假申请";
     private static final String LEAVE_APPROVAL_NAME = "请假审批";
-    private static final String AWARD_APPROVAL_NAME = "奖助审批";
-    private static final String LEAVE_CANCEL_APPROVAL_NAME = "销假审批";
 
     private final LeaveApplicationRepository leaveApplicationRepository;
     private final AwardApplicationRepository awardApplicationRepository;
-    private final ApprovalTaskRepository approvalTaskRepository;
     private final LeaveApplicationService leaveApplicationService;
     private final AwardApplicationService awardApplicationService;
 
@@ -264,4 +252,5 @@ public class ProcessService {
     private boolean isStaffRole(Admin admin) {
         return admin != null && admin.getTeacherId() != null && admin.getTeacherId() != 0;
     }
+
 }

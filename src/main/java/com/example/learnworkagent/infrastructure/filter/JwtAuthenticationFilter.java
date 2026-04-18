@@ -3,7 +3,6 @@ package com.example.learnworkagent.infrastructure.filter;
 import com.example.learnworkagent.common.util.JwtUtil;
 import com.example.learnworkagent.domain.user.entity.Admin;
 import com.example.learnworkagent.domain.user.repository.AdminRepository;
-import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

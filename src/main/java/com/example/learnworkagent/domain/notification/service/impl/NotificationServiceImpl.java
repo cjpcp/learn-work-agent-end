@@ -30,7 +30,6 @@ public class NotificationServiceImpl implements NotificationService {
 
     private static final String SORT_FIELD_CREATE_TIME = "createTime";
     private static final String FORBIDDEN_READ_MESSAGE = "无权操作此通知";
-    private static final String FORBIDDEN_DELETE_MESSAGE = "无权删除此通知";
 
     private final NotificationRepository notificationRepository;
     private final RabbitTemplate rabbitTemplate;

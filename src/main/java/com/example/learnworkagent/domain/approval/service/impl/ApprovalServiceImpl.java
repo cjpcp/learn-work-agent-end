@@ -18,10 +18,7 @@ import com.example.learnworkagent.domain.approval.repository.ApprovalTaskReposit
 import com.example.learnworkagent.domain.approval.handler.BusinessTypeHandler;
 import com.example.learnworkagent.domain.approval.handler.BusinessTypeHandlerFactory;
 import com.example.learnworkagent.domain.approval.service.ApprovalService;
-import com.example.learnworkagent.domain.award.entity.AwardApplication;
 import com.example.learnworkagent.domain.award.repository.AwardApplicationRepository;
-import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
-import com.example.learnworkagent.domain.leave.repository.LeaveApplicationRepository;
 import com.example.learnworkagent.domain.notification.entity.NotificationMessage;
 import com.example.learnworkagent.domain.notification.service.NotificationService;
 import com.example.learnworkagent.domain.user.entity.Admin;
@@ -36,7 +33,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -45,8 +41,8 @@ import java.util.List;
 /**
  * 审批服务实现
  * 通知策略：
- *   1. 提交申请/流转到新节点 -> 通知对应审批者（站内信+邮件）
- *   2. 审批结束（最终通过或拒绝）-> 通知申请者（站内信+邮件）
+ * 1. 提交申请/流转到新节点 -> 通知对应审批者（站内信+邮件）
+ * 2. 审批结束（最终通过或拒绝）-> 通知申请者（站内信+邮件）
  */
 @Slf4j
 @Service
@@ -60,26 +56,24 @@ public class ApprovalServiceImpl implements ApprovalService {
             NotificationChannelEnum.EMAIL.getCode()
     );
 
-    private static final String INSTANCE_PENDING  = ApprovalStatusEnum.PENDING.getCode();
     private static final String INSTANCE_APPROVED = ApprovalStatusEnum.APPROVED.getCode();
     private static final String INSTANCE_REJECTED = ApprovalStatusEnum.REJECTED.getCode();
-    private static final String TASK_PROCESSING   = ApprovalStatusEnum.PROCESSING.getCode();
-    private static final String TASK_APPROVED     = ApprovalStatusEnum.APPROVED.getCode();
-    private static final String TASK_REJECTED     = ApprovalStatusEnum.REJECTED.getCode();
+    private static final String TASK_PROCESSING = ApprovalStatusEnum.PROCESSING.getCode();
+    private static final String TASK_APPROVED = ApprovalStatusEnum.APPROVED.getCode();
+    private static final String TASK_REJECTED = ApprovalStatusEnum.REJECTED.getCode();
     private static final String STATUS_TEXT_APPROVED = "已通过";
     private static final String STATUS_TEXT_REJECTED = "未通过";
 
     private final ApprovalInstanceRepository instanceRepository;
-    private final ApprovalTaskRepository     taskRepository;
-    private final ApprovalProcessRepository  processRepository;
-    private final ApprovalStepRepository     stepRepository;
+    private final ApprovalTaskRepository taskRepository;
+    private final ApprovalProcessRepository processRepository;
+    private final ApprovalStepRepository stepRepository;
     private final AwardApplicationRepository awardApplicationRepository;
-    private final LeaveApplicationRepository leaveApplicationRepository;
-    private final AdminRepository            adminRepository;
-    private final TeacherRepository          teacherRepository;
-    private final RoleRepository             roleRepository;
-    private final ObjectMapper               objectMapper;
-    private final NotificationService        notificationService;
+    private final AdminRepository adminRepository;
+    private final TeacherRepository teacherRepository;
+    private final RoleRepository roleRepository;
+    private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
     private final BusinessTypeHandlerFactory handlerFactory;
 
     // =======================================================
@@ -146,26 +140,26 @@ public class ApprovalServiceImpl implements ApprovalService {
     public List<ApprovalTaskDTO> getPendingTasks(Long approverId) {
         List<ApprovalTask> tasks = taskRepository.findByApproverIdAndStatus(approverId, TASK_PROCESSING);
         return tasks.stream()
-            .filter(task -> {
-                if (BUSINESS_TYPE_AWARD.equals(task.getInstance().getBusinessType())) {
-                    Long businessId = task.getInstance().getBusinessId();
-                    return awardApplicationRepository.findById(businessId)
-                        .map(app -> !INSTANCE_REJECTED.equals(app.getApprovalStatus()))
-                        .orElse(false);
-                }
-                return true;
-            })
-            .map(task -> {
-                ApprovalTaskDTO dto = new ApprovalTaskDTO();
-                dto.setId(task.getId());
-                dto.setBusinessId(task.getInstance().getBusinessId());
-                dto.setBusinessType(task.getInstance().getBusinessType());
-                dto.setStatus(task.getStatus());
-                dto.setCreateTime(task.getCreateTime());
-                dto.setApproverId(task.getApproverId());
-                dto.setStepName(task.getStep().getStepName());
-                return dto;
-            }).toList();
+                .filter(task -> {
+                    if (BUSINESS_TYPE_AWARD.equals(task.getInstance().getBusinessType())) {
+                        Long businessId = task.getInstance().getBusinessId();
+                        return awardApplicationRepository.findById(businessId)
+                                .map(app -> !INSTANCE_REJECTED.equals(app.getApprovalStatus()))
+                                .orElse(false);
+                    }
+                    return true;
+                })
+                .map(task -> {
+                    ApprovalTaskDTO dto = new ApprovalTaskDTO();
+                    dto.setId(task.getId());
+                    dto.setBusinessId(task.getInstance().getBusinessId());
+                    dto.setBusinessType(task.getInstance().getBusinessType());
+                    dto.setStatus(task.getStatus());
+                    dto.setCreateTime(task.getCreateTime());
+                    dto.setApproverId(task.getApproverId());
+                    dto.setStepName(task.getStep().getStepName());
+                    return dto;
+                }).toList();
     }
 
     @Override
@@ -315,7 +309,9 @@ public class ApprovalServiceImpl implements ApprovalService {
     // 通知方法
     // =======================================================
 
-    /** 通知审批者：您有新的待审批任务 */
+    /**
+     * 通知审批者：您有新的待审批任务
+     */
     private void notifyApprover(ApprovalTask task, ApprovalInstance instance) {
         try {
             Admin approver = adminRepository.findById(task.getApproverId()).orElse(null);
@@ -339,7 +335,9 @@ public class ApprovalServiceImpl implements ApprovalService {
         }
     }
 
-    /** 通知申请者：审批最终结果（通过或拒绝） */
+    /**
+     * 通知申请者：审批最终结果（通过或拒绝）
+     */
     private void notifyApplicant(ApprovalInstance instance, String finalStatus,
                                  Long approverId, String comment) {
         try {

@@ -7,7 +7,6 @@ import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
 import com.example.learnworkagent.domain.consultation.entity.HumanTransfer;
-import com.example.learnworkagent.domain.consultation.repository.ConsultationQuestionRepository;
 import com.example.learnworkagent.domain.consultation.repository.HumanTransferRepository;
 import com.example.learnworkagent.domain.consultation.service.ConsultationService;
 import com.example.learnworkagent.domain.consultation.service.HumanTransferConfigService;
@@ -42,7 +41,6 @@ public class HumanTransferController extends BaseController {
     private final HumanTransferService humanTransferService;
     private final HumanTransferConfigService humanTransferConfigService;
     private final HumanTransferRepository humanTransferRepository;
-    private final ConsultationQuestionRepository consultationQuestionRepository;
     private final ConsultationService consultationService;
     private final AdminRepository adminRepository;
 

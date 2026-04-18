@@ -54,7 +54,6 @@ import java.util.stream.Stream;
 public class AwardApplicationService {
 
     private static final String BUSINESS_TYPE_AWARD = NotificationBusinessTypeEnum.AWARD.getCode();
-    private static final String SORT_FIELD_CREATE_TIME = "createTime";
     private static final String MATERIAL_COMMENT_PASSED = "材料完整，通过预审";
     private static final Duration MATERIAL_CHECK_TIMEOUT = Duration.ofMinutes(5);
 

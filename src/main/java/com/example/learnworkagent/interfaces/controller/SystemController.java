@@ -64,12 +64,12 @@ public class SystemController extends BaseController {
     /**
      * 分页获取用户列表，支持多条件筛选.
      *
-     * @param pageRequest      分页参数
-     * @param roleId          角色ID筛选（可选）
-     * @param teacherKeyword   教师姓名/卡号关键词筛选（可选）
-     * @param username         用户名筛选（可选）
-     * @param nick             昵称筛选（可选）
-     * @param status           状态筛选（可选）
+     * @param pageRequest    分页参数
+     * @param roleId         角色ID筛选（可选）
+     * @param teacherKeyword 教师姓名/卡号关键词筛选（可选）
+     * @param username       用户名筛选（可选）
+     * @param nick           昵称筛选（可选）
+     * @param status         状态筛选（可选）
      * @return 分页后的用户列表
      */
     @Operation(summary = "分页获取用户列表")

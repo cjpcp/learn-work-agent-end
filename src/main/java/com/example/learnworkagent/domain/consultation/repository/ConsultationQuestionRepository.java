@@ -30,16 +30,6 @@ public interface ConsultationQuestionRepository extends JpaRepository<Consultati
     Page<ConsultationQuestion> findByUserIdAndDeletedFalseOrderByCreateTimeDesc(Long userId, Pageable pageable);
 
     /**
-     * 根据状态查询
-     */
-    Page<ConsultationQuestion> findByStatusAndDeletedFalseOrderByCreateTimeDesc(String status, Pageable pageable);
-
-    /**
-     * 根据分类查询
-     */
-    Page<ConsultationQuestion> findByCategoryAndDeletedFalseOrderByCreateTimeDesc(String category, Pageable pageable);
-
-    /**
      * 根据会话ID查询该会话所有问题，按时间升序
      */
     @Query("SELECT cq FROM ConsultationQuestion cq WHERE cq.sessionId = :sessionId AND cq.deleted = false ORDER BY cq.createTime ASC")

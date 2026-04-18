@@ -1,10 +1,8 @@
 package com.example.learnworkagent.interfaces.controller;
 
 import com.example.learnworkagent.common.Result;
-import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
-import com.example.learnworkagent.common.exception.BusinessException;
 import com.example.learnworkagent.domain.consultation.dto.ConsultationRequest;
 import com.example.learnworkagent.domain.consultation.dto.ConversationMessageDTO;
 import com.example.learnworkagent.domain.consultation.dto.TransferToHumanRequest;
@@ -335,7 +333,7 @@ public class ConsultationController extends BaseController {
 
         String finalUploadedVoiceUrl = uploadedVoiceUrl;
         consultationService.createQuestion(userId, questionText, "TEXT", null, uploadedVoiceUrl, sessionId,
-                fileInputs.isEmpty() ? null : fileInputs)
+                        fileInputs.isEmpty() ? null : fileInputs)
                 .flatMapMany(saved -> {
                     final List<ConsultationRequest.FileInput> fileInputList = new java.util.ArrayList<>(fileInputs);
                     try {
@@ -377,29 +375,29 @@ public class ConsultationController extends BaseController {
                 })
                 .publishOn(Schedulers.boundedElastic())
                 .subscribe(
-                chunk -> {
-                    try {
-                        Map<String, String> data = new HashMap<>();
-                        data.put("answer", chunk);
-                        emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(data)));
-                    } catch (IOException e) {
-                        log.error("发送SSE失败", e);
-                    }
-                },
-                error -> {
-                    log.error("SSE流处理错误，userId: {}", userId, error);
-                    try {
-                        emitter.send(SseEmitter.event().data("{\"error\": \"" + error.getMessage() + "\"}"));
-                    } catch (IOException e) {
-                        log.error("发送错误消息失败", e);
-                    }
-                    emitter.complete();
-                },
-                () -> {
-                    log.info("SSE流处理完成，userId: {}", userId);
-                    emitter.complete();
-                }
-        );
+                        chunk -> {
+                            try {
+                                Map<String, String> data = new HashMap<>();
+                                data.put("answer", chunk);
+                                emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(data)));
+                            } catch (IOException e) {
+                                log.error("发送SSE失败", e);
+                            }
+                        },
+                        error -> {
+                            log.error("SSE流处理错误，userId: {}", userId, error);
+                            try {
+                                emitter.send(SseEmitter.event().data("{\"error\": \"" + error.getMessage() + "\"}"));
+                            } catch (IOException e) {
+                                log.error("发送错误消息失败", e);
+                            }
+                            emitter.complete();
+                        },
+                        () -> {
+                            log.info("提交咨询问题（流式响应+附件同步上传）：SSE流处理完成，userId: {}", userId);
+                            emitter.complete();
+                        }
+                );
 
         return emitter;
     }

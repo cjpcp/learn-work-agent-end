@@ -81,10 +81,6 @@ public class Notification extends BaseEntity {
     @Column(name = "channel_status", length = 500)
     private String channelStatus;
 
-    public boolean isUnread() {
-        return !Boolean.TRUE.equals(isRead);
-    }
-
     public void markRead(LocalDateTime readTime) {
         this.isRead = Boolean.TRUE;
         this.readTime = readTime;

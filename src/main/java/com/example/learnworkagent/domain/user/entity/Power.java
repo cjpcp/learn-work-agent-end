@@ -26,11 +26,11 @@ public class Power {
     private Long id;
 
     @Comment("权限名称")
-    @Column(name = "power_name", nullable = false, length = 255)
+    @Column(name = "power_name", nullable = false)
     private String powerName;
 
     @Comment("权限地址")
-    @Column(name = "power_url", nullable = false, length = 255)
+    @Column(name = "power_url", nullable = false)
     private String powerUrl;
 
     @Column(name = "created_at")
