@@ -5,22 +5,17 @@ import com.example.learnworkagent.common.ResultCode;
 import com.example.learnworkagent.common.dto.PageRequest;
 import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.exception.BusinessException;
-import com.example.learnworkagent.domain.leave.dto.ApprovalRequest;
 import com.example.learnworkagent.domain.leave.dto.LeaveApplicationRequest;
+import com.example.learnworkagent.domain.leave.dto.LeaveSlipPreviewRequest;
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.service.LeaveApplicationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -94,20 +89,6 @@ public class LeaveController extends BaseController {
     }
 
     /**
-     * 审批请假申请。
-     *
-     * @param id 请假申请ID
-     * @param request 审批参数
-     * @return 响应结果
-     */
-    @Operation(summary = "审批请假申请")
-    @PostMapping("/applications/{id}/approve")
-    public Result<Void> approveApplication(@PathVariable Long id, @Valid @RequestBody ApprovalRequest request) {
-        leaveApplicationService.approveLeaveApplication(id, getRequiredCurrentUserId(), request.getApprovalStatus(), request.getApprovalComment());
-        return Result.success();
-    }
-
-    /**
      * 生成请假条。
      *
      * @param id 请假申请ID
@@ -118,6 +99,22 @@ public class LeaveController extends BaseController {
     public Result<Void> generateLeaveSlip(@PathVariable Long id) {
         leaveApplicationService.generateLeaveSlip(id);
         return Result.success();
+    }
+
+    @Operation(summary = "预览请假条")
+    @PostMapping("/slip-preview")
+    public void previewLeaveSlip(@Valid @RequestBody LeaveSlipPreviewRequest request, HttpServletResponse response) {
+        byte[] docBytes = leaveApplicationService.generateLeaveSlipPreview(request);
+        try {
+            String fileName = "请假条_" + request.getStudentName() + "_" + request.getStartDate() + ".docx";
+            String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+            response.setContentType(DOCX_CONTENT_TYPE);
+            response.setHeader("Content-Disposition", CONTENT_DISPOSITION_TEMPLATE.formatted(encodedFileName, encodedFileName));
+            response.getOutputStream().write(docBytes);
+            response.getOutputStream().flush();
+        } catch (IOException exception) {
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "生成请假条预览失败: " + exception.getMessage());
+        }
     }
 
     /**
@@ -131,6 +128,22 @@ public class LeaveController extends BaseController {
     public Result<Void> requestCancelLeave(@PathVariable Long id) {
         leaveApplicationService.requestCancelLeave(id);
         return Result.success();
+    }
+
+    @Operation(summary = "审批销假申请")
+    @PostMapping("/applications/{id}/approve-cancel")
+    public Result<Void> approveCancelRequest(@PathVariable Long id,
+                                             @RequestBody ApproveCancelRequest request) {
+        boolean approved = "APPROVED".equals(request.getApprovalStatus());
+        leaveApplicationService.approveCancelRequest(id, approved, request.getApprovalComment());
+        return Result.success();
+    }
+
+    @Data
+    public static class ApproveCancelRequest {
+        private String approvalStatus;
+        private String approvalComment;
+
     }
 
     /**
@@ -147,23 +160,9 @@ public class LeaveController extends BaseController {
     }
 
     /**
-     * 审批销假申请。
-     *
-     * @param id 请假申请ID
-     * @param request 审批参数
-     * @return 响应结果
-     */
-    @Operation(summary = "审批销假申请")
-    @PostMapping("/applications/{id}/approve-cancel")
-    public Result<Void> approveCancelRequest(@PathVariable Long id, @Valid @RequestBody ApprovalRequest request) {
-        leaveApplicationService.approveCancelRequest(id, "APPROVED".equals(request.getApprovalStatus()), request.getApprovalComment());
-        return Result.success();
-    }
-
-    /**
      * 下载请假条。
      *
-     * @param id 请假申请ID
+     * @param id       请假申请ID
      * @param response HTTP 响应
      */
     @Operation(summary = "下载请假条", description = "下载已生成的请假条Word文档(.docx)")

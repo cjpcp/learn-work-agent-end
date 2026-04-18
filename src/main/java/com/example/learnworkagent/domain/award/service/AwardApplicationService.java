@@ -7,6 +7,7 @@ import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
 import com.example.learnworkagent.common.enums.MaterialStatusEnum;
 import com.example.learnworkagent.common.enums.NotificationBusinessTypeEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
+import com.example.learnworkagent.common.utils.ApplicationServiceUtils;
 import com.example.learnworkagent.domain.approval.dto.ApprovalTaskDTO;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
@@ -22,7 +23,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -180,8 +180,12 @@ public class AwardApplicationService {
             return result;
         } catch (Exception exception) {
             log.error("Dify工作流识别失败", exception);
-            result.put("pass", false);
-            result.put("reason", "材料预审服务响应超时，请稍后重试或联系管理员");
+            if (result != null) {
+                result.put("pass", false);
+            }
+            if (result != null) {
+                result.put("reason", "材料预审服务响应超时，请稍后重试或联系管理员");
+            }
         }
         return result;
     }
@@ -247,15 +251,11 @@ public class AwardApplicationService {
     }
 
     private Pageable buildPageable(PageRequest pageRequest) {
-        return org.springframework.data.domain.PageRequest.of(
-                pageRequest.getPage(),
-                pageRequest.getPageSize(),
-                Sort.by(Sort.Direction.DESC, SORT_FIELD_CREATE_TIME)
-        );
+        return ApplicationServiceUtils.buildPageable(pageRequest);
     }
 
     private PageResult<AwardApplication> buildPageResult(Page<AwardApplication> page, PageRequest pageRequest) {
-        return new PageResult<>(page.getContent(), page.getTotalElements(), pageRequest.getPageNum(), pageRequest.getPageSize());
+        return ApplicationServiceUtils.buildPageResult(page, pageRequest);
     }
 
     private Specification<AwardApplication> buildPendingApplicationsSpecification(List<Long> applicationIds) {

@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -50,6 +51,28 @@ public class TemplateService {
             List<XWPFTable> tables = document.getTables();
             if (!tables.isEmpty()) {
                 fillTable(tables.get(0), applicantName, cardNumber, grade, className, phone, leaveType, dateRange, days, reason);
+            }
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            document.write(outputStream);
+            return outputStream.toByteArray();
+        }
+    }
+
+    public byte[] generateLeaveSlipPreview(String studentName, String cardNumber, String grade, String className,
+                                           String phone, String leaveType, LocalDate startDate,
+                                           LocalDate endDate, int days, String reason) throws Exception {
+        ClassPathResource resource = new ClassPathResource("templates/请假模板.docx");
+        try (InputStream inputStream = resource.getInputStream(); XWPFDocument document = new XWPFDocument(inputStream)) {
+            String startDateStr = startDate.format(DATE_FORMATTER);
+            String endDateStr = endDate.format(DATE_FORMATTER);
+            String dateRange = startDateStr + " 至 " + endDateStr;
+            String daysStr = days + " 天";
+            String leaveTypeDesc = LeaveTypeEnum.getDescriptionByCode(leaveType);
+
+            List<XWPFTable> tables = document.getTables();
+            if (!tables.isEmpty()) {
+                fillTable(tables.get(0), studentName, cardNumber, grade, className, phone, leaveTypeDesc, dateRange, daysStr, reason);
             }
 
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();

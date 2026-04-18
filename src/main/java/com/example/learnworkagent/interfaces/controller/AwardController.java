@@ -6,7 +6,6 @@ import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.domain.award.dto.AwardApplicationRequest;
 import com.example.learnworkagent.domain.award.entity.AwardApplication;
 import com.example.learnworkagent.domain.award.service.AwardApplicationService;
-import com.example.learnworkagent.domain.leave.dto.ApprovalRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -84,21 +83,6 @@ public class AwardController extends BaseController {
         Long approverId = getCurrentUserId();
         PageResult<AwardApplication> result = awardApplicationService.getPendingApplications(approverId, pageRequest);
         return Result.success(result);
-    }
-
-    /**
-     * 审批指定的奖助申请.
-     *
-     * @param id      奖助申请记录ID
-     * @param request 审批请求参数，包含审批状态（通过/拒绝）和审批意见
-     * @return 操作结果
-     */
-    @Operation(summary = "审批奖助申请")
-    @PostMapping("/applications/{id}/approve")
-    public Result<Void> approveApplication(@PathVariable Long id, @Valid @RequestBody ApprovalRequest request) {
-        Long approverId = getCurrentUserId();
-        awardApplicationService.approveAwardApplication(id, approverId, request.getApprovalStatus(), request.getApprovalComment());
-        return Result.success();
     }
 
     @Operation(summary = "撤销奖助申请")

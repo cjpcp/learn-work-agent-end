@@ -23,6 +23,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -195,7 +196,7 @@ public class ConsultationService {
                             String name = url.substring(lastSlash + 1);
                             int qIdx = name.indexOf('?');
                             if (qIdx > 0) name = name.substring(0, qIdx);
-                            try { name = java.net.URLDecoder.decode(name, java.nio.charset.StandardCharsets.UTF_8.name()); } catch (Exception ignored) {}
+                            try { name = java.net.URLDecoder.decode(name, StandardCharsets.UTF_8); } catch (Exception ignored) {}
                             fileMap.put("name", name);
                         } else {
                             fileMap.put("name", "附件");
@@ -292,7 +293,8 @@ public class ConsultationService {
     public List<Map<String, Object>> parseFileUrls(String fileUrlsJson) {
         if (fileUrlsJson == null || fileUrlsJson.isBlank()) return new java.util.ArrayList<>();
         try {
-            List<String> urls = objectMapper.readValue(fileUrlsJson, new TypeReference<List<String>>() {});
+            List<String> urls = objectMapper.readValue(fileUrlsJson, new TypeReference<>() {
+            });
             return urls.stream().map(url -> {
                 Map<String, Object> fileMap = new java.util.HashMap<>();
                 fileMap.put("url", url);

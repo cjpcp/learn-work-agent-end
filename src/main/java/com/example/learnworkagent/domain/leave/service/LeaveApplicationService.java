@@ -6,10 +6,12 @@ import com.example.learnworkagent.common.dto.PageResult;
 import com.example.learnworkagent.common.enums.ApprovalStatusEnum;
 import com.example.learnworkagent.common.enums.LeaveSlipStatusEnum;
 import com.example.learnworkagent.common.exception.BusinessException;
+import com.example.learnworkagent.common.utils.ApplicationServiceUtils;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
 import com.example.learnworkagent.domain.approval.service.ApprovalService;
 import com.example.learnworkagent.domain.leave.dto.LeaveApplicationRequest;
+import com.example.learnworkagent.domain.leave.dto.LeaveSlipPreviewRequest;
 import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
 import com.example.learnworkagent.domain.leave.repository.LeaveApplicationRepository;
 import com.example.learnworkagent.infrastructure.external.oss.OssService;
@@ -23,7 +25,6 @@ import java.time.LocalDateTime;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -131,6 +132,27 @@ public class LeaveApplicationService {
         } catch (Exception exception) {
             log.error("生成请假条失败，申请ID: {}", application.getId(), exception);
             throw new BusinessException(ResultCode.SYSTEM_ERROR, "生成请假条失败: " + exception.getMessage());
+        }
+    }
+
+    public byte[] generateLeaveSlipPreview(LeaveSlipPreviewRequest request) {
+        int days = (int) java.time.temporal.ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
+        try {
+            return templateService.generateLeaveSlipPreview(
+                    request.getStudentName(),
+                    request.getCardNumber(),
+                    request.getGrade(),
+                    request.getClassName(),
+                    request.getPhone(),
+                    request.getLeaveType(),
+                    request.getStartDate(),
+                    request.getEndDate(),
+                    days,
+                    request.getReason()
+            );
+        } catch (Exception exception) {
+            log.error("生成请假条预览失败", exception);
+            throw new BusinessException(ResultCode.SYSTEM_ERROR, "生成请假条预览失败: " + exception.getMessage());
         }
     }
 
@@ -332,20 +354,11 @@ public class LeaveApplicationService {
     }
 
     private Pageable buildPageable(PageRequest pageRequest) {
-        return org.springframework.data.domain.PageRequest.of(
-                pageRequest.getPage(),
-                pageRequest.getPageSize(),
-                Sort.by(Sort.Direction.DESC, SORT_FIELD_CREATE_TIME)
-        );
+        return ApplicationServiceUtils.buildPageable(pageRequest);
     }
 
     private PageResult<LeaveApplication> buildPageResult(Page<LeaveApplication> page, PageRequest pageRequest) {
-        return new PageResult<>(
-                page.getContent(),
-                page.getTotalElements(),
-                pageRequest.getPageNum(),
-                pageRequest.getPageSize()
-        );
+        return ApplicationServiceUtils.buildPageResult(page, pageRequest);
     }
 
     @Transactional
