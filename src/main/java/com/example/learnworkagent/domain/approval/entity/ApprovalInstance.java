@@ -80,10 +80,6 @@ public class ApprovalInstance extends BaseEntity {
         return ApprovalStatusEnum.APPROVED.getCode().equals(status);
     }
 
-    public boolean isRejected() {
-        return ApprovalStatusEnum.REJECTED.getCode().equals(status);
-    }
-
     public void markPending(Integer currentStep) {
         this.status = ApprovalStatusEnum.PENDING.getCode();
         this.currentStep = currentStep;

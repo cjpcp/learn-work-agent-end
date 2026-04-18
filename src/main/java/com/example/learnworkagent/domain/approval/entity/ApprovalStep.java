@@ -1,7 +1,6 @@
 package com.example.learnworkagent.domain.approval.entity;
 
 import com.example.learnworkagent.common.BaseEntity;
-import com.example.learnworkagent.common.enums.RoleEnum;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.JoinColumn;
@@ -64,10 +63,6 @@ public class ApprovalStep extends BaseEntity {
     @Column(name = "role_id", length = 50)
     private String roleId;
 
-    public boolean isSingleApproval() {
-        return APPROVAL_TYPE_SINGLE.equals(approvalType);
-    }
-
     public boolean isMultipleApproval() {
         return APPROVAL_TYPE_MULTIPLE.equals(approvalType);
     }
@@ -78,18 +73,6 @@ public class ApprovalStep extends BaseEntity {
 
     public boolean allowsRejectContinue() {
         return isMultipleApproval() && Boolean.FALSE.equals(mustPass);
-    }
-
-    public boolean isCounselorStep() {
-        return RoleEnum.COUNSELOR.getCode().equals(approverRole);
-    }
-
-    public boolean isCollegeLeaderStep() {
-        return RoleEnum.COLLEGE_LEADER.getCode().equals(approverRole);
-    }
-
-    public boolean isDepartmentLeaderStep() {
-        return RoleEnum.DEPARTMENT_LEADER.getCode().equals(approverRole);
     }
 
     public boolean hasAssignedApprover() {

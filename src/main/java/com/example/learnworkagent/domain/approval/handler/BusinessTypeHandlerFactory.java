@@ -2,7 +2,6 @@ package com.example.learnworkagent.domain.approval.handler;
 
 import org.springframework.stereotype.Component;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -25,7 +24,4 @@ public class BusinessTypeHandlerFactory {
         return handlers.get(businessType);
     }
 
-    public Collection<BusinessTypeHandler> getAllHandlers() {
-        return handlers.values();
-    }
 }
