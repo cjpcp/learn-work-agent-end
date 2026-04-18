@@ -59,6 +59,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .securityContext(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**", "/api/v1/system/roles", "/api/v1/system/roles/staff", "/api/test/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/actuator/**", "/error", "/ws/**", "/health").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()

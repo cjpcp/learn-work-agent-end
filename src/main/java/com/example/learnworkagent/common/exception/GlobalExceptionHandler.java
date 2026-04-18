@@ -110,7 +110,9 @@ public class GlobalExceptionHandler {
 
     private Object buildResponse(NativeWebRequest request, HttpStatus httpStatus, Result<Void> result) {
         if (isSseRequest(request)) {
-            return ResponseEntity.status(httpStatus).body(result);
+            return ResponseEntity.status(httpStatus)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(result);
         }
         return result;
     }

@@ -9,13 +9,8 @@ import com.example.learnworkagent.domain.consultation.dto.ConsultationRequest;
 import com.example.learnworkagent.domain.consultation.dto.ConversationMessageDTO;
 import com.example.learnworkagent.domain.consultation.dto.TransferToHumanRequest;
 import com.example.learnworkagent.domain.consultation.entity.ConsultationQuestion;
-import com.example.learnworkagent.domain.consultation.entity.HumanTransfer;
-import com.example.learnworkagent.domain.consultation.repository.HumanTransferRepository;
 import com.example.learnworkagent.domain.consultation.service.ConsultationService;
 import com.example.learnworkagent.domain.consultation.service.HumanTransferService;
-import com.example.learnworkagent.domain.consultation.service.HumanTransferConfigService;
-import com.example.learnworkagent.domain.user.entity.Admin;
-import com.example.learnworkagent.domain.user.repository.AdminRepository;
 import com.example.learnworkagent.infrastructure.external.oss.OssService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,9 +48,6 @@ public class ConsultationController extends BaseController {
 
     private final ConsultationService consultationService;
     private final HumanTransferService humanTransferService;
-    private final HumanTransferConfigService humanTransferConfigService;
-    private final HumanTransferRepository humanTransferRepository;
-    private final AdminRepository adminRepository;
     private final OssService ossService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -133,15 +125,6 @@ public class ConsultationController extends BaseController {
     public Result<Void> transferToHuman(@PathVariable Long id, @RequestBody TransferToHumanRequest request) throws JsonProcessingException {
         Long userId = getCurrentUserId();
         humanTransferService.createTransfer(id, userId, "MANUAL", request.getReason(),
-                request.getQuestionType(), request.getQuestionText(), request.getFiles());
-        return Result.success();
-    }
-
-    @Operation(summary = "直接申请转人工（无关联问题）")
-    @PostMapping("/transfer")
-    public Result<Void> directTransferToHuman(@RequestBody TransferToHumanRequest request) throws JsonProcessingException {
-        Long userId = getCurrentUserId();
-        humanTransferService.createTransfer(null, userId, "MANUAL", request.getReason(),
                 request.getQuestionType(), request.getQuestionText(), request.getFiles());
         return Result.success();
     }
@@ -419,109 +402,6 @@ public class ConsultationController extends BaseController {
         );
 
         return emitter;
-    }
-
-    @Operation(summary = "分页查询用户的转人工记录")
-    @GetMapping("/transfers")
-    public Result<PageResult<HumanTransfer>> getUserTransfers(@Valid PageRequest pageRequest) {
-        Long userId = getCurrentUserId();
-        PageResult<HumanTransfer> result = humanTransferService.getUserTransfers(userId, pageRequest);
-        return Result.success(result);
-    }
-
-    @Operation(summary = "获取转人工记录详情")
-    @GetMapping("/transfers/{id}")
-    public Result<Map<String, Object>> getTransferDetail(@PathVariable Long id) {
-        if (id == null) {
-            throw new BusinessException(ResultCode.PARAM_ERROR, "转接记录ID不能为空");
-        }
-        HumanTransfer transfer = humanTransferRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(ResultCode.PARAM_ERROR, "转人工记录不存在"));
-
-        List<Map<String, Object>> historyWithFiles = new java.util.ArrayList<>();
-        if (transfer.getQuestionId() != null) {
-            List<ConsultationQuestion> history = consultationService.getHistoryByUserIdUpToQuestion(
-                    transfer.getUserId(), transfer.getQuestionId());
-            historyWithFiles = history.stream().map(q -> {
-                Map<String, Object> map = new java.util.HashMap<>();
-                map.put("id", q.getId());
-                map.put("questionText", q.getQuestionText());
-                map.put("answer", q.getAiAnswer());
-                map.put("humanReply", q.getHumanReply());
-                map.put("answerSource", q.getAnswerSource());
-                map.put("createTime", q.getCreateTime());
-                map.put("files", consultationService.parseFileUrls(q.getFileUrls()));
-                return map;
-            }).toList();
-        }
-
-        Map<String, Object> result = new java.util.HashMap<>();
-        result.put("transfer", transfer);
-        result.put("history", historyWithFiles);
-        return Result.success(result);
-    }
-
-    @Operation(summary = "分配工作人员")
-    @PostMapping("/transfers/{id}/assign")
-    public Result<Void> assignStaff(@PathVariable Long id, @RequestParam Long staffId) {
-        if (id == null) {
-            throw new BusinessException(ResultCode.PARAM_ERROR, "转接记录ID不能为空");
-        }
-        humanTransferService.assignStaff(id, staffId);
-        return Result.success();
-    }
-
-    @Operation(summary = "工作人员回复")
-    @PostMapping("/transfers/{id}/reply")
-    public Result<Void> reply(@PathVariable Long id, @RequestParam String reply) {
-        if (id == null) {
-            throw new BusinessException(ResultCode.PARAM_ERROR, "转接记录ID不能为空");
-        }
-        Long staffId = getCurrentUserId();
-        humanTransferService.reply(id, staffId, reply);
-        return Result.success();
-    }
-
-    @Operation(summary = "直接处理转接记录")
-    @PostMapping("/transfers/{id}/process")
-    public Result<Void> process(@PathVariable Long id, @RequestParam String reply) {
-        if (id == null) {
-            throw new BusinessException(ResultCode.PARAM_ERROR, "转接记录ID不能为空");
-        }
-        Long staffId = getCurrentUserId();
-        humanTransferService.process(id, staffId, reply);
-        return Result.success();
-    }
-
-    @Operation(summary = "分页查询工作人员的转接记录")
-    @GetMapping("/transfers/staff")
-    public Result<PageResult<HumanTransfer>> getStaffTransfers(@Valid PageRequest pageRequest) {
-        Long staffId = getCurrentUserId();
-        PageResult<HumanTransfer> result = humanTransferService.getStaffTransfers(staffId, pageRequest);
-        return Result.success(result);
-    }
-
-    @Operation(summary = "分页查询工作人员已完成的转接记录")
-    @GetMapping("/transfers/completed")
-    public Result<PageResult<HumanTransfer>> getCompletedTransfers(@Valid PageRequest pageRequest) {
-        Long staffId = getCurrentUserId();
-        PageResult<HumanTransfer> result = humanTransferService.getCompletedTransfers(staffId, pageRequest);
-        return Result.success(result);
-    }
-
-    @Operation(summary = "检查当前用户是否有权限查看人工处理中心")
-    @GetMapping("/transfer-config/permission")
-    public Result<Boolean> checkTransferConfigPermission() {
-        Long userId = getCurrentUserId();
-        if (userId == null) {
-            return Result.success(false);
-        }
-        Admin admin = adminRepository.findById(userId).orElse(null);
-        if (admin == null) {
-            return Result.success(false);
-        }
-        boolean hasPermission = humanTransferConfigService.isCurrentUserInTransferConfig(userId, admin.getRoleId());
-        return Result.success(hasPermission);
     }
 
     private String extractFileNameFromUrl(String url) {
