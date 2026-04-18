@@ -1,11 +1,6 @@
 package com.example.learnworkagent.infrastructure.external.template;
 
 import com.example.learnworkagent.common.enums.LeaveTypeEnum;
-import com.example.learnworkagent.domain.leave.entity.LeaveApplication;
-import com.example.learnworkagent.domain.user.entity.Admin;
-import com.example.learnworkagent.domain.user.entity.Teacher;
-import com.example.learnworkagent.domain.user.repository.AdminRepository;
-import com.example.learnworkagent.domain.user.repository.TeacherRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -29,35 +24,6 @@ import java.util.List;
 public class TemplateService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月dd日");
-
-    private final AdminRepository adminRepository;
-    private final TeacherRepository teacherRepository;
-
-    public byte[] generateLeaveSlip(LeaveApplication application) throws Exception {
-        ClassPathResource resource = new ClassPathResource("templates/请假模板.docx");
-        try (InputStream inputStream = resource.getInputStream(); XWPFDocument document = new XWPFDocument(inputStream)) {
-            String applicantName = resolveApplicantName(application);
-            String cardNumber = resolveCardNumber(application.getApplicantId());
-            String grade = defaultText(application.getGrade());
-            String className = defaultText(application.getClassName());
-            String phone = resolvePhone(application.getApplicantId());
-            String leaveType = LeaveTypeEnum.getDescriptionByCode(application.getLeaveType());
-            String startDate = application.getStartDate().format(DATE_FORMATTER);
-            String endDate = application.getEndDate().format(DATE_FORMATTER);
-            String dateRange = startDate + " 至 " + endDate;
-            String days = application.getDays() + " 天";
-            String reason = defaultText(application.getReason());
-
-            List<XWPFTable> tables = document.getTables();
-            if (!tables.isEmpty()) {
-                fillTable(tables.get(0), applicantName, cardNumber, grade, className, phone, leaveType, dateRange, days, reason);
-            }
-
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            document.write(outputStream);
-            return outputStream.toByteArray();
-        }
-    }
 
     public byte[] generateLeaveSlipPreview(String studentName, String cardNumber, String grade, String className,
                                            String phone, String leaveType, LocalDate startDate,
@@ -154,35 +120,4 @@ public class TemplateService {
         }
     }
 
-    private String resolveApplicantName(LeaveApplication application) {
-        if (application.getStudentName() != null && !application.getStudentName().isBlank()) {
-            return application.getStudentName();
-        }
-        return resolveTeacher(application.getApplicantId()).map(Teacher::getName).orElse("");
-    }
-
-    private String resolveCardNumber(Long applicantId) {
-        return resolveTeacher(applicantId).map(Teacher::getCardNumber).map(this::defaultText).orElse("");
-    }
-
-    private String resolvePhone(Long applicantId) {
-        return resolveTeacher(applicantId).map(Teacher::getPhone).map(this::defaultText).orElse("");
-    }
-
-    private java.util.Optional<Teacher> resolveTeacher(Long applicantId) {
-        try {
-            Admin admin = adminRepository.findById(applicantId).orElse(null);
-            if (admin == null || admin.getTeacherId() == null) {
-                return java.util.Optional.empty();
-            }
-            return teacherRepository.findById(admin.getTeacherId());
-        } catch (Exception exception) {
-            log.error("获取申请人教师信息失败", exception);
-            return java.util.Optional.empty();
-        }
-    }
-
-    private String defaultText(String value) {
-        return value != null ? value : "";
-    }
 }

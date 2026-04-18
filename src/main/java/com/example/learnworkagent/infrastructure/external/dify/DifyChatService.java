@@ -31,25 +31,9 @@ public class DifyChatService {
     @Value("${dify.chat.api-key:app-WVk7LOKCEjRHeoaiPf536xKh}")
     private String chatApiKey;
 
-    @Value("${dify.chat.app-id:}")
-    private String appId;
-
     public DifyChatService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder
                 .build();
-    }
-
-    /**
-     * 调用Dify聊天API进行智能咨询（流式响应）
-     *
-     * @param query          用户问题
-     * @param fileUrls       文件URL列表（可选）
-     * @param conversationId 对话ID（可选）
-     * @param user           用户标识
-     * @return 流式响应
-     */
-    public Flux<String> chatStream(String query, List<String> fileUrls, String conversationId, String user) {
-        return chatStream(query, fileUrls, conversationId, user, null);
     }
 
     /**
