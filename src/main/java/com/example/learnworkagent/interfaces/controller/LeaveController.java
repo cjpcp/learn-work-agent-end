@@ -30,8 +30,6 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 public class LeaveController extends BaseController {
 
-    private static final String LEAVE_SLIP_FILE_PREFIX = "请假条_";
-    private static final String LEAVE_SLIP_FILE_SUFFIX = ".docx";
     private static final String DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     private static final String CONTENT_DISPOSITION_TEMPLATE = "attachment; filename=\"%s\"; filename*=UTF-8''%s";
 
@@ -48,6 +46,19 @@ public class LeaveController extends BaseController {
     public Result<LeaveApplication> submitApplication(@Valid @RequestBody LeaveApplicationRequest request) {
         LeaveApplication application = leaveApplicationService.submitLeaveApplication(getRequiredCurrentUserId(), request);
         return Result.success(application);
+    }
+
+    /**
+     * 撤销请假申请。
+     *
+     * @param id 请假申请ID
+     * @return 响应结果
+     */
+    @Operation(summary = "撤销请假申请")
+    @DeleteMapping("/applications/{id}")
+    public Result<Void> withdrawApplication(@PathVariable Long id) {
+        leaveApplicationService.withdrawApplication(id, getRequiredCurrentUserId());
+        return Result.success();
     }
 
     /**
@@ -73,32 +84,6 @@ public class LeaveController extends BaseController {
     public Result<PageResult<LeaveApplication>> getMyApplications(@Valid PageRequest pageRequest) {
         PageResult<LeaveApplication> result = leaveApplicationService.getUserApplications(getRequiredCurrentUserId(), pageRequest);
         return Result.success(result);
-    }
-
-    /**
-     * 分页查询待审批销假申请。
-     *
-     * @param pageRequest 分页参数
-     * @return 分页结果
-     */
-    @Operation(summary = "分页查询待审批销假申请")
-    @GetMapping("/applications/pending-cancel")
-    public Result<PageResult<LeaveApplication>> getPendingCancelRequests(@Valid PageRequest pageRequest) {
-        PageResult<LeaveApplication> result = leaveApplicationService.getPendingCancelRequests(getRequiredCurrentUserId(), pageRequest);
-        return Result.success(result);
-    }
-
-    /**
-     * 生成请假条。
-     *
-     * @param id 请假申请ID
-     * @return 响应结果
-     */
-    @Operation(summary = "生成请假条")
-    @PostMapping("/applications/{id}/generate-slip")
-    public Result<Void> generateLeaveSlip(@PathVariable Long id) {
-        leaveApplicationService.generateLeaveSlip(id);
-        return Result.success();
     }
 
     @Operation(summary = "预览请假条")
@@ -139,6 +124,19 @@ public class LeaveController extends BaseController {
         return Result.success();
     }
 
+    /**
+     * 分页查询待审批销假申请。
+     *
+     * @param pageRequest 分页参数
+     * @return 分页结果
+     */
+    @Operation(summary = "分页查询待审批销假申请")
+    @GetMapping("/applications/pending-cancel")
+    public Result<PageResult<LeaveApplication>> getPendingCancelRequests(@Valid PageRequest pageRequest) {
+        PageResult<LeaveApplication> result = leaveApplicationService.getPendingCancelRequests(getRequiredCurrentUserId(), pageRequest);
+        return Result.success(result);
+    }
+
     @Data
     public static class ApproveCancelRequest {
         private String approvalStatus;
@@ -146,44 +144,6 @@ public class LeaveController extends BaseController {
 
     }
 
-    /**
-     * 撤销请假申请。
-     *
-     * @param id 请假申请ID
-     * @return 响应结果
-     */
-    @Operation(summary = "撤销请假申请")
-    @DeleteMapping("/applications/{id}")
-    public Result<Void> withdrawApplication(@PathVariable Long id) {
-        leaveApplicationService.withdrawApplication(id, getRequiredCurrentUserId());
-        return Result.success();
-    }
-
-    /**
-     * 下载请假条。
-     *
-     * @param id       请假申请ID
-     * @param response HTTP 响应
-     */
-    @Operation(summary = "下载请假条", description = "下载已生成的请假条Word文档(.docx)")
-    @GetMapping("/applications/{id}/download-slip")
-    public void downloadLeaveSlip(@PathVariable Long id, HttpServletResponse response) {
-        LeaveApplication application = leaveApplicationService.getApplicationById(id);
-        if (!application.hasGeneratedLeaveSlip()) {
-            leaveApplicationService.generateLeaveSlip(application);
-            application = leaveApplicationService.getApplicationById(id);
-        }
-
-        try {
-            String fileName = LEAVE_SLIP_FILE_PREFIX + id + LEAVE_SLIP_FILE_SUFFIX;
-            String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
-            response.setContentType(DOCX_CONTENT_TYPE);
-            response.setHeader("Content-Disposition", CONTENT_DISPOSITION_TEMPLATE.formatted(encodedFileName, encodedFileName));
-            response.sendRedirect(application.getLeaveSlipUrl());
-        } catch (IOException exception) {
-            throw new BusinessException(ResultCode.SYSTEM_ERROR, "下载请假条失败: " + exception.getMessage());
-        }
-    }
 
     private Long getRequiredCurrentUserId() {
         Long userId = getCurrentUserId();

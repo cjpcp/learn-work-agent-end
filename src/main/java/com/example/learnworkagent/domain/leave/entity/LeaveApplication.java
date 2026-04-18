@@ -142,16 +142,6 @@ public class LeaveApplication extends BaseEntity {
     private String className;
 
     /**
-     * 标记请假条已生成。
-     *
-     * @param leaveSlipUrl 请假条地址
-     */
-    public void markLeaveSlipGenerated(String leaveSlipUrl) {
-        this.leaveSlipStatus = LeaveSlipStatusEnum.GENERATED.getCode();
-        this.leaveSlipUrl = leaveSlipUrl;
-    }
-
-    /**
      * 标记为已销假。
      */
     public void markCancelled() {
@@ -168,12 +158,4 @@ public class LeaveApplication extends BaseEntity {
         return ApprovalStatusEnum.APPROVED.getCode().equals(this.approvalStatus);
     }
 
-    /**
-     * 判断请假条是否已生成。
-     *
-     * @return 是否已生成
-     */
-    public boolean hasGeneratedLeaveSlip() {
-        return leaveSlipUrl != null && !leaveSlipUrl.isBlank();
-    }
 }
