@@ -4,6 +4,8 @@ import com.example.learnworkagent.domain.approval.dto.ApprovalTaskDTO;
 import com.example.learnworkagent.domain.approval.entity.ApprovalInstance;
 import com.example.learnworkagent.domain.approval.entity.ApprovalTask;
 
+import java.util.List;
+
 /**
  * 审批服务接口.
  * <p>定义审批流程的核心业务逻辑，包括创建审批实例、处理审批任务等.</p>
@@ -74,4 +76,8 @@ public interface ApprovalService {
      * @param reason       拒绝原因
      */
     void rejectPendingTasks(String businessType, Long businessId, String reason);
+
+    ApprovalTask getTaskById(Long taskId);
+
+    List<ApprovalTaskDTO> getCompletedTasksByApprover(Long approverId);
 }

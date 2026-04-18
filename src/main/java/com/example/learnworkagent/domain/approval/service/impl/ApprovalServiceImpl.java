@@ -461,4 +461,27 @@ public class ApprovalServiceImpl implements ApprovalService {
         updateBusinessStatus(instance, null, reason);
         notifyApplicant(instance, INSTANCE_REJECTED, null, reason);
     }
+
+    @Override
+    public ApprovalTask getTaskById(Long taskId) {
+        return taskRepository.findById(taskId).orElse(null);
+    }
+
+    @Override
+    public List<ApprovalTaskDTO> getCompletedTasksByApprover(Long approverId) {
+        List<ApprovalTask> tasks = taskRepository.findByApproverIdAndStatusIn(
+                approverId, List.of(TASK_APPROVED, TASK_REJECTED));
+        return tasks.stream()
+                .map(task -> {
+                    ApprovalTaskDTO dto = new ApprovalTaskDTO();
+                    dto.setId(task.getId());
+                    dto.setBusinessId(task.getInstance().getBusinessId());
+                    dto.setBusinessType(task.getInstance().getBusinessType());
+                    dto.setStatus(task.getStatus());
+                    dto.setCreateTime(task.getCreateTime());
+                    dto.setApproverId(task.getApproverId());
+                    dto.setStepName(task.getStep().getStepName());
+                    return dto;
+                }).toList();
+    }
 }
