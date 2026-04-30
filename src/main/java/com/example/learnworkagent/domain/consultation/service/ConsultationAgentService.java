@@ -87,7 +87,7 @@ public class ConsultationAgentService {
 
             List<String> fileUrls = resolveFileUrls(question);
             String query = buildQuery(question);
-            String prompt = buildPrompt(question, query);
+            String prompt = buildPrompt(query);
             log.info("调用Dify AI，问题ID: {}, 文件数: {}", questionId,
                     fileUrls != null ? fileUrls.size() : 0);
 
@@ -160,14 +160,18 @@ public class ConsultationAgentService {
     /**
      * 构建AI提示词
      *
-     * @param question 咨询问题实体（用于获取分类等元数据）
      * @param query    经过语音转文字处理后的最终用户问题内容
      */
-    private String buildPrompt(ConsultationQuestion question, String query) {
+    private String buildPrompt(String query) {
         return "你是一个学工智能助手，专门回答学生关于奖助勤贷、宿舍管理、违纪申诉、心理健康、就业指导等方面的问题。" +
-                "\n\n问题分类：" + question.getCategory() +
-                "\n问题内容：" + query +
-                "\n\n请提供准确、详细的回答，并给出相关的流程指引。";
+                "\n\n问题内容：" + query +
+                "\n\n请提供准确、详细的回答，并给出相关的流程指引。" +
+                "\n\n重要提示：当你认为问题涉及以下模块时，请在回答末尾追加对应的跳转链接（使用HTML格式）：" +
+                "\n- 如果涉及奖助勤贷（奖学金、助学金、困难补助等），在回答最后添加：<br><a href='/award/apply'>📌 如需直接跳转办理，可点击此处：前往奖助申请</a>" +
+                "\n- 如果涉及请假申请（事假、公假等），在回答最后添加：<br><a href='/leave/apply'>📌 如需直接跳转办理，可点击此处：前往请假申请</a>" +
+                "\n- 如果涉及流程服务（审批进度、在线办理等），在回答最后添加：<br><a href='/process'>📌 如需直接跳转办理，可点击此处：前往流程服务</a>" +
+                "\n- 如果问题不涉及任何具体模块，不需要添加链接" +
+                "\n\n注意：跳转链接必须是有效的HTML <a> 标签格式，href属性指定跳转路径。";
     }
 
     /**
@@ -284,7 +288,7 @@ public class ConsultationAgentService {
 
                     List<String> fileUrls = resolveFileUrls(question);
                     String query = buildQuery(question);
-                    String prompt = buildPrompt(question, query);
+                    String prompt = buildPrompt(query);
                     log.info("调用Dify AI，问题ID: {}, 文件数: {}", questionId,
                             fileUrls != null ? fileUrls.size() : 0);
 
@@ -305,7 +309,8 @@ public class ConsultationAgentService {
                             .doOnComplete(() -> {
                                 log.info("Dify API调用完成，问题ID: {}", questionId);
                                 Mono.fromRunnable(() -> {
-                                            question.setAiAnswer(partialAnswer.toString());
+                                            String answer = partialAnswer.toString();
+                                            question.setAiAnswer(answer);
                                             question.setStatus("ANSWERED");
                                             question.setAnswerSource("AI");
                                             question.setIsAnswering(false);

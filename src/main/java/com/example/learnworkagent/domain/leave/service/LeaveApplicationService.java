@@ -280,7 +280,7 @@ public class LeaveApplicationService {
         return Stream.of(ApprovalStatusEnum.APPROVED, ApprovalStatusEnum.REJECTED)
                 .flatMap(status -> findApplicationsByStatus(userId, status).stream())
                 .map(app -> {
-                    String description = ApprovalStatusEnum.APPROVED.equals(app.getApprovalStatus())
+                    String description = ApprovalStatusEnum.APPROVED.getCode().equals(app.getApprovalStatus())
                             ? "您的请假申请已批准"
                             : "您的请假申请已拒绝";
                     return buildProcessItem(
